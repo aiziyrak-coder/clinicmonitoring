@@ -68,6 +68,11 @@ class Command(BaseCommand):
             default="167.71.53.238",
             help="Qurilmada 'Server IP' maydoni (ma'lumot)",
         )
+        parser.add_argument(
+            "--hl7-handshake",
+            action="store_true",
+            help="Ulanishda MLLP salom yuborish (ba'zi firmware; ko'pincha o'chiq — RST+0 bayt bo'lsa)",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -129,10 +134,8 @@ class Command(BaseCommand):
         if device.hl7_peer_ip in ("127.0.0.1", "::1"):
             device.hl7_peer_ip = None
             device.save(update_fields=["hl7_peer_ip"])
-        # Yangi o'rnatishda: default K12 id uchun HL7 salom (migration ham mavjud qurilmalarni yangilaydi)
-        if created and device_id == DEFAULT_DEVICE_ID and device.hl7_connect_handshake is None:
-            device.hl7_connect_handshake = True
-            device.save(update_fields=["hl7_connect_handshake"])
+        device.hl7_connect_handshake = bool(options["hl7_handshake"])
+        device.save(update_fields=["hl7_connect_handshake"])
 
         now_ms = int(time.time() * 1000)
         patient_id = options["patient_id"]
@@ -166,6 +169,7 @@ class Command(BaseCommand):
                 f"peer_ip={device.hl7_peer_ip or '—'}, bed={bed.id}. "
                 f"Bemor: {patient_id} — {pname}. "
                 f"Qurilmada Server {options['server_ip']}:6006, HL7 yoqilgan. "
-                f"NAT bo'lsa: python manage.py setup_real_hl7_monitor --peer-ip <server_log_IP>"
+                f"MLLP salom: {device.hl7_connect_handshake}. "
+                f"NAT bo'lsa: --peer-ip <journaldagi peer IP>"
             )
         )

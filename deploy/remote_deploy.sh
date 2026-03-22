@@ -82,7 +82,12 @@ export DJANGO_SQLITE_PATH="$APP_ROOT/backend/data/db.sqlite3"
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py ensure_fjsti_login
-python manage.py setup_real_hl7_monitor
+K12_PEER_IP="${K12_PEER_IP:-188.113.206.112}"
+python manage.py setup_real_hl7_monitor \
+  --device-ip 192.168.0.228 \
+  --peer-ip "${K12_PEER_IP}" \
+  --mac 02:03:06:02:A3:F0 \
+  --server-ip 167.71.53.238
 chown -R www-data:www-data "$APP_ROOT/backend/data" || true
 
 systemctl enable --now redis-server || true

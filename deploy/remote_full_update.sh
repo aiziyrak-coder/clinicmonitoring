@@ -43,7 +43,14 @@ fi
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py ensure_fjsti_login
-python manage.py setup_real_hl7_monitor
+# K12 «Интернет»: Server 167.71.53.238, Разъем 6006, lokal 192.168.0.228, MAC ekrandan
+# NAT peer (journaldagi tashqi IP) — o'zgarganda serverda: export K12_PEER_IP=...
+K12_PEER_IP="${K12_PEER_IP:-188.113.206.112}"
+python manage.py setup_real_hl7_monitor \
+  --device-ip 192.168.0.228 \
+  --peer-ip "${K12_PEER_IP}" \
+  --mac 02:03:06:02:A3:F0 \
+  --server-ip 167.71.53.238
 chown -R www-data:www-data "$APP_ROOT/backend/data" 2>/dev/null || true
 
 echo "=== frontend ==="
