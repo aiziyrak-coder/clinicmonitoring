@@ -68,6 +68,8 @@ sudo chown -R www-data:www-data /var/www/clinicmonitoring/frontend/dist
 
 ## 5. systemd (Daphne)
 
+**Bir nechta backend** bitta serverda bo‘lsa, `127.0.0.1:8000` boshqa loyiha (Gunicorn) bilan band bo‘lishi mumkin. Repodagi standart sozlama **8012** portida Daphne ishga tushadi; nginx `upstream` ham shu portga mos keladi.
+
 ```bash
 sudo cp /opt/clinicmonitoring/deploy/clinicmonitoring-daphne.service /etc/systemd/system/
 sudo systemctl daemon-reload
