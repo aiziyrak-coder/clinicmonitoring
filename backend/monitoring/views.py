@@ -160,7 +160,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 elif empty_n > 0:
                     warnings.append(
                         f"Oxirgi sessiya: TCP {empty_n} bayt keldi, lekin MSH/HL7 ajratilmadi — "
-                        "boshqa freyming yoki kodlash. .env: HL7_LOG_FIRST_RECV_HEX=true, keyin journalctl."
+                        "boshqa freyming yoki kodlash. .env: HL7_DEBUG=true yoki HL7_LOG_FIRST_RECV_HEX=true, keyin journalctl."
                     )
             if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
                 warnings.append(

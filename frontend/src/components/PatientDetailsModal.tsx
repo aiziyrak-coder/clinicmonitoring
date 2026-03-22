@@ -351,7 +351,8 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                     bu yerda bo‘lmasa, serverda <span className="font-mono text-zinc-400">journalctl -u clinicmonitoring-daphne</span> da
                     «HL7: vitallar ajratilmadi» / «vitallar qabul qilindi» qatorlarini tekshiring. Kerak bo‘lsa
                     backend <span className="font-mono text-zinc-400">.env</span> da
-                    <span className="font-mono text-zinc-400">HL7_LOG_RAW_PREVIEW=true</span> yoki{' '}
+                    <span className="font-mono text-zinc-400">HL7_DEBUG=true</span> (barcha xom loglar) yoki{' '}
+                    <span className="font-mono text-zinc-400">HL7_LOG_RAW_PREVIEW=true</span> /{' '}
                     <span className="font-mono text-zinc-400">HL7_LOG_RAW_TCP_RECV=true</span> (vaqtincha), Daphne qayta ishga tushiring — logda xom HL7 ko‘rinadi (maxfiylik!).
                   </p>
                 </div>

@@ -204,7 +204,9 @@ def _recv_hl7_chunk(conn: socket.socket) -> bytes:
 
 def _maybe_log_tcp_raw_diagnostic(peer_ip: str, tail: bytes) -> None:
     """MSH topilmasa — xom baytlarni (PHI!) faqat ixtiyoriy log."""
-    if os.environ.get("HL7_LOG_RAW_TCP_RECV", "").lower() not in ("1", "true", "yes", "on"):
+    from monitoring.hl7_env import want_log_raw_tcp_recv
+
+    if not want_log_raw_tcp_recv():
         return
     if not tail:
         return
@@ -241,12 +243,9 @@ def _recv_all_hl7_payloads(
         total_recv_bytes += len(chunk)
         if not first_chunk_logged:
             first_chunk_logged = True
-            if os.environ.get("HL7_LOG_FIRST_RECV_HEX", "").lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            ):
+            from monitoring.hl7_env import want_log_first_recv_hex
+
+            if want_log_first_recv_hex():
                 prev = chunk[:160]
                 logger.info(
                     "HL7: birinchi TCP recv peer=%s len=%s hex=%s",
@@ -455,12 +454,9 @@ def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> Non
             hl7_segment_type_summary(text),
             len(text),
         )
-        if os.environ.get("HL7_LOG_RAW_PREVIEW", "").lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        ):
+        from monitoring.hl7_env import want_log_raw_preview
+
+        if want_log_raw_preview():
             prev = text[: min(900, len(text))].replace("\r", "¶")
             logger.warning("HL7 diagn: xom matn (PHI bo'lishi mumkin): %s", prev)
 
