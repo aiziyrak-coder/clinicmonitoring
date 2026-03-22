@@ -2,6 +2,9 @@
 # Faqat hl7_real + bemor (cm-k12-001) — to'liq deploysiz
 set -euo pipefail
 APP_ROOT="${APP_ROOT:-/opt/clinicmonitoring}"
+cd "$APP_ROOT"
+git fetch origin
+git reset --hard origin/main
 cd "$APP_ROOT/backend"
 # shellcheck source=/dev/null
 . .venv/bin/activate
