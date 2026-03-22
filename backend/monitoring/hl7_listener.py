@@ -175,6 +175,14 @@ def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> Non
             hl7_segment_type_summary(text),
             len(text),
         )
+        if os.environ.get("HL7_LOG_RAW_PREVIEW", "").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            prev = text[: min(900, len(text))].replace("\r", "¶")
+            logger.warning("HL7 diagn: xom matn (PHI bo'lishi mumkin): %s", prev)
 
 
 def _serve_loop(host: str, port: int) -> None:

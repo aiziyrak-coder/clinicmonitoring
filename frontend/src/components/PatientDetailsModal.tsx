@@ -347,9 +347,11 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                   <p className="text-zinc-300">
                     HL7 ulanishi bo‘lishi mumkin, lekin serverga OBX ichida YUCh/SpO2 kabi qiymatlar
                     yetib kelmayapti — odatda sensorlar ulanmagan (masalan, ECG lead off, SpO2 yo‘q) yoki
-                    monitor HL7 da faqat xizmat xabarlarini yuboradi. Monitorda raqamlar ko‘rinib turib,
+                    monitor HL7 da faqat xizmat xabarlarini yuboradi.                     Monitorda raqamlar ko‘rinib turib,
                     bu yerda bo‘lmasa, serverda <span className="font-mono text-zinc-400">journalctl -u clinicmonitoring-daphne</span> da
-                    «HL7: vitallar ajratilmadi» / «vitallar qabul qilindi» qatorlarini tekshiring.
+                    «HL7: vitallar ajratilmadi» / «vitallar qabul qilindi» qatorlarini tekshiring. Kerak bo‘lsa
+                    backend <span className="font-mono text-zinc-400">.env</span> da
+                    <span className="font-mono text-zinc-400">HL7_LOG_RAW_PREVIEW=true</span> (vaqtincha), Daphne qayta ishga tushiring — logda xom HL7 ko‘rinadi (maxfiylik!).
                   </p>
                 </div>
               )}

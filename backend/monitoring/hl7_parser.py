@@ -268,9 +268,17 @@ def _text_skip_header_segments(text: str) -> str:
     return "\r".join(lines)
 
 
+# Ba'zi monitorlar vitallarni OBX o'rniga OBR, NTE, ST yoki Z* segmentlarida yuboradi.
+_PIPE_VITAL_LINE = re.compile(
+    r"^(OBX|OBR|NTE|ST|Z[A-Z0-9]{1,10})\|",
+    re.I,
+)
+
+
 def _harvest_obx_numeric_scan(text: str) -> dict[str, Any]:
     """
-    OBX-3 noto'g'ri yoki bo'sh bo'lsa ham OBX qatorlaridagi raqamlarni yig'adi.
+    OBX-3 noto'g'ri yoki bo'sh bo'lsa ham pipe-segment qatorlaridagi raqamlarni yig'adi.
+    OBR/NTE/ST/Z* qatorlari ham qo'shildi (Creative Medical / OEM variantlari).
     Alohida maydonlarda sys/dia (120 va 80) kabi juftliklarni NIBP deb ajratadi.
     """
     out: dict[str, Any] = {}
@@ -281,7 +289,7 @@ def _harvest_obx_numeric_scan(text: str) -> dict[str, Any]:
 
     for line in text.split("\r"):
         line = line.strip()
-        if not line or not re.match(r"^OBX\|", line, re.I):
+        if not line or not _PIPE_VITAL_LINE.match(line):
             continue
         parts = line.split("|")
         i = 5
@@ -380,6 +388,21 @@ def _fallback_regex_scan(text: str) -> dict[str, Any]:
         v = int(spo2_cyr.group(1))
         if 70 <= v <= 100:
             out["spo2"] = v
+    # |ЧСС|105|, |HR|110| — pipe bilan ajratilgan qisqa format
+    pipe_hr = re.search(
+        r"\|(?:HR|PR|PULSE|ПУЛЬС|ЧСС|ЧПС)\|(\d{2,3})\b",
+        body,
+        re.IGNORECASE,
+    )
+    if pipe_hr and "hr" not in out:
+        v = int(pipe_hr.group(1))
+        if 35 <= v <= 220:
+            out["hr"] = v
+    pipe_spo = re.search(r"\|(?:SPO2|SpO2|СПО2)\|(\d{2,3})\b", body, re.IGNORECASE)
+    if pipe_spo and "spo2" not in out:
+        v = int(pipe_spo.group(1))
+        if 70 <= v <= 100:
+            out["spo2"] = v
 
     return out
 
@@ -436,8 +459,11 @@ def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     """
     raw = raw.lstrip(b"\xef\xbb\xbf")
     candidates: list[tuple[int, dict[str, Any]]] = []
-    for enc in ("utf-8", "cp1251", "latin-1"):
-        t = raw.decode(enc, errors="replace")
+    for enc in ("utf-8", "cp1251", "latin-1", "gbk"):
+        try:
+            t = raw.decode(enc, errors="replace")
+        except LookupError:
+            continue
         v = parse_hl7_vitals(t)
         if v:
             candidates.append((len(v), v))
