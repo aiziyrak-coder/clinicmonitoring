@@ -1,0 +1,66 @@
+name: MediCentral CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py migrate --noinput
+      - name: Smoke /api/health/
+        shell: bash
+        run: |
+          python manage.py shell <<'PY'
+          from django.test import Client
+          r = Client().get("/api/health/")
+          assert r.status_code == 200, r.content
+          data = r.json()
+          assert data.get("status") == "ok"
+          assert data.get("database") == "connected"
+          PY
+
+  docker-backend:
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image (Dockerfile tekshiruvi)
+        run: docker build -f backend/Dockerfile -t medicentral-backend:ci ./backend
+
+  # Registry va klaster kalitlari tayyor bo‘lganda yoqing (secrets: DOCKERHUB_*, KUBE_CONFIG)
+  # docker-push:
+  #   needs: docker-backend
+  #   if: github.ref == 'refs/heads/main'
+  #   ...

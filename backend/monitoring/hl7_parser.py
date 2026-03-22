@@ -1,0 +1,256 @@
+"""
+HL7 v2.x xabarlardan (asosan ORU^R01) vital ko'rsatkichlarni ajratish.
+Turli monitorlar OBX-3 ni boshqacha to'ldiradi; Creative Medical va boshqalar uchun kengaytirilgan.
+"""
+from __future__ import annotations
+
+import re
+from typing import Any
+
+# LOINC va umumiy kalit so'zlar
+_LOINC_HR = frozenset({"8867-4", "heart rate", "hr", "pulse", "pr"})
+_LOINC_SPO2 = frozenset({"2708-6", "spo2", "sp o2", "oxygen saturation", "sao2"})
+_LOINC_TEMP = frozenset({"8310-5", "body temperature", "temp", "temperature"})
+_LOINC_RR = frozenset({"9279-1", "respiratory rate", "rr"})
+_NIBP_RE = re.compile(r"^(\d{2,3})\s*/\s*(\d{2,3})$")
+_NUMERIC = re.compile(r"^\d+(\.\d+)?$")
+
+
+def _norm_obx3_id(field: str) -> str:
+    f = field.strip().lower()
+    parts = f.split("^")
+    for p in parts:
+        p = p.strip().lower()
+        if p.isdigit() and len(p) >= 3:
+            return p
+    return f
+
+
+def _classify_obx3(field: str) -> str | None:
+    nid = _norm_obx3_id(field)
+    blob = nid.replace("|", " ")
+    for token in blob.split():
+        t = token.strip().lower()
+        if t in _LOINC_HR or "heart" in blob or "pulse" in blob or blob.startswith("8867"):
+            return "hr"
+        if t in _LOINC_SPO2 or "spo2" in blob or "oxygen" in blob or "2708" in blob:
+            return "spo2"
+        if t in _LOINC_TEMP or "temp" in blob or "8310" in blob:
+            return "temp"
+        if t in _LOINC_RR or "resp" in blob:
+            return "rr"
+        if "nibp" in blob or "blood pressure" in blob or "n_bp" in blob or "bp" == t:
+            return "nibp_combined"
+    if "mdc" in blob and ("hr" in blob or "heart" in blob or "ecg" in blob):
+        return "hr"
+    if "mdc" in blob and ("spo2" in blob or "pulse ox" in blob):
+        return "spo2"
+    return None
+
+
+def _extract_obx_value(parts: list[str]) -> str:
+    """OBX qiymati ba'zan 5-7 maydonlardan birida (ishlab chiqaruvchiga qarab)."""
+    for i in range(5, min(len(parts), 12)):
+        raw = parts[i].strip() if i < len(parts) else ""
+        if not raw:
+            continue
+        first = raw.split("^")[0].strip()
+        if _NIBP_RE.match(first.replace(" ", "")):
+            return first
+        if _NUMERIC.match(first.replace(",", ".")):
+            return first
+        if "/" in first and re.search(r"\d{2,3}\s*/\s*\d{2,3}", first):
+            return first
+    return parts[5].strip() if len(parts) > 5 else ""
+
+
+def _parse_float(s: str) -> float | None:
+    s = s.strip()
+    if not s:
+        return None
+    try:
+        return float(s.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _heuristic_kind_from_value(v: int, out: dict[str, Any]) -> str | None:
+    """
+    OBX-3 noma'lum bo'lganda: SpO2 odatda 70–100, YUCh 35–220.
+    Avval SpO2 diapazoni (98 kabi qiymatlar HR ga tushib qolmasin).
+    """
+    if 70 <= v <= 100 and "spo2" not in out:
+        return "spo2"
+    if 35 <= v <= 220 and "hr" not in out:
+        return "hr"
+    if 50 <= v <= 100 and "spo2" not in out:
+        return "spo2"
+    return None
+
+
+def _parse_one_obx_line(parts: list[str], out: dict[str, Any]) -> None:
+    if len(parts) < 4:
+        return
+    obx3 = parts[3] if len(parts) > 3 else ""
+    value = _extract_obx_value(parts)
+    kind = _classify_obx3(obx3)
+
+    if not kind:
+        vs = value.strip()
+        if vs.isdigit() or (_NUMERIC.match(vs.replace(",", "."))):
+            v = int(round(float(vs.replace(",", "."))))
+            kind = _heuristic_kind_from_value(v, out)
+        if not kind:
+            return
+
+    if kind == "nibp_combined":
+        m = _NIBP_RE.match(value.replace(" ", ""))
+        if m:
+            out["nibpSys"] = int(m.group(1))
+            out["nibpDia"] = int(m.group(2))
+        return
+
+    fv = _parse_float(value)
+    if fv is None:
+        return
+    if kind == "hr":
+        out["hr"] = int(round(fv))
+    elif kind == "spo2":
+        out["spo2"] = int(round(fv))
+    elif kind == "temp":
+        out["temp"] = round(fv, 1)
+    elif kind == "rr":
+        out["rr"] = int(round(fv))
+
+
+def _fallback_ordered_obx(text: str) -> dict[str, Any]:
+    """
+    Hech narsa topilmasa: OBX qatorlaridagi raqamlarni ketma-ketlikda YUCh, SpO2, AQB deb olish.
+    Ko'p monitorlar bir xil tartibda yuboradi.
+    """
+    out: dict[str, Any] = {}
+    text = text.replace("\n", "\r")
+    nums: list[float] = []
+    nibp_done = False
+
+    for line in text.split("\r"):
+        line = line.strip()
+        if not line.upper().startswith("OBX|"):
+            continue
+        parts = line.split("|")
+        value = _extract_obx_value(parts)
+        if not value:
+            continue
+        m = _NIBP_RE.match(value.replace(" ", ""))
+        if m:
+            out["nibpSys"] = int(m.group(1))
+            out["nibpDia"] = int(m.group(2))
+            nibp_done = True
+            continue
+        fv = _parse_float(value)
+        if fv is None:
+            continue
+        v = float(fv)
+        nums.append(v)
+
+    if nums:
+        i = 0
+        if "hr" not in out and i < len(nums):
+            v = int(round(nums[i]))
+            if 35 <= v <= 220:
+                out["hr"] = v
+                i += 1
+        if "spo2" not in out and i < len(nums):
+            v = int(round(nums[i]))
+            if 50 <= v <= 100:
+                out["spo2"] = v
+                i += 1
+        if not nibp_done and "nibpSys" not in out and i + 1 < len(nums):
+            sys_, dia_ = int(round(nums[i])), int(round(nums[i + 1]))
+            if 40 <= sys_ <= 260 and 30 <= dia_ <= 180:
+                out["nibpSys"] = sys_
+                out["nibpDia"] = dia_
+
+    return out
+
+
+def _text_skip_header_segments(text: str) -> str:
+    """MSH/PID/PV1 qatorlarida vaqt/ID raqamlari HR/SpO2 bilan aralashmasin."""
+    lines: list[str] = []
+    for line in text.replace("\n", "\r").split("\r"):
+        u = line.strip().upper()
+        if u.startswith(("MSH|", "PID|", "PV1|", "EVN|")):
+            continue
+        lines.append(line)
+    return "\r".join(lines)
+
+
+def _fallback_regex_scan(text: str) -> dict[str, Any]:
+    """
+    OBX maydonlari noto'g'ri bo'lsa: NIBP (sys/dia) va matndagi HR/SpO2 kalit so'zlari.
+    Tasodifiy raqamlarni taxmin qilib olmaymiz (PID/MSH bilan aralashadi).
+    """
+    out: dict[str, Any] = {}
+    body = _text_skip_header_segments(text)
+    m = re.search(r"\b(\d{2,3})\s*/\s*(\d{2,3})\b", body)
+    if m:
+        s, d = int(m.group(1)), int(m.group(2))
+        if 50 <= s <= 280 and 30 <= d <= 200 and s >= d:
+            out["nibpSys"] = s
+            out["nibpDia"] = d
+
+    hr_m = re.search(
+        r"(?:^|[|\s])(?:PR|HR|PULSE|HEART\s*RATE)[^|\d]{0,24}(\d{2,3})\b",
+        body,
+        re.IGNORECASE,
+    )
+    if hr_m:
+        v = int(hr_m.group(1))
+        if 35 <= v <= 220:
+            out["hr"] = v
+    spo2_m = re.search(
+        r"(?:SPO2|SAO2|O2\s*SAT|OXYGEN\s*SAT)[^|\d]{0,24}(\d{2,3})\b",
+        body,
+        re.IGNORECASE,
+    )
+    if spo2_m:
+        v = int(spo2_m.group(1))
+        if 70 <= v <= 100:
+            out["spo2"] = v
+
+    return out
+
+
+def hl7_segment_type_summary(hl7_text: str) -> str:
+    """Diagnostika: qaysi segmentlar bor (PHI chiqarmasdan)."""
+    types: list[str] = []
+    for line in hl7_text.replace("\n", "\r").split("\r"):
+        line = line.strip()
+        if "|" not in line:
+            continue
+        seg = line.split("|", 1)[0].strip().upper()[:12]
+        if seg and seg not in types:
+            types.append(seg)
+    return ",".join(types[:40])
+
+
+def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
+    """
+    OBX segmentlaridan hr, spo2, temp, rr, nibpSys, nibpDia ni chiqaradi.
+    """
+    out: dict[str, Any] = {}
+    text = hl7_text.replace("\n", "\r")
+
+    for line in text.split("\r"):
+        line = line.strip()
+        if not line.upper().startswith("OBX|"):
+            continue
+        parts = line.split("|")
+        _parse_one_obx_line(parts, out)
+
+    if not out:
+        out = _fallback_ordered_obx(text)
+    if not out:
+        out = _fallback_regex_scan(text)
+
+    return out

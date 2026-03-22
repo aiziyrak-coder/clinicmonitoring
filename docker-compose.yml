@@ -1,0 +1,28 @@
+# Lokal / staging: backend + Redis (ko‘p foydalanuvchi WebSocket uchun)
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_SQLITE_PATH: /app/data/db.sqlite3
+    depends_on:
+      - redis
+    volumes:
+      - backend_sqlite:/app/data
+
+volumes:
+  redis_data:
+  backend_sqlite:

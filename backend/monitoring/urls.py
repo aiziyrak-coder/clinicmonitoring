@@ -1,0 +1,23 @@
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from monitoring import auth_views, views
+
+router = DefaultRouter()
+router.register(r"departments", views.DepartmentViewSet, basename="department")
+router.register(r"rooms", views.RoomViewSet, basename="room")
+router.register(r"beds", views.BedViewSet, basename="bed")
+router.register(r"devices", views.DeviceViewSet, basename="device")
+
+urlpatterns = [
+    path("auth/session/", auth_views.auth_session),
+    path("auth/login/", auth_views.auth_login),
+    path("auth/logout/", auth_views.auth_logout),
+    # Routerdan oldin — aks holda `from-screen` pk deb olinadi
+    path("devices/from-screen/", views.device_from_screen),
+    path("", include(router.urls)),
+    path("infrastructure/", views.infrastructure),
+    path("patients/", views.patients_list),
+    path("health/", views.health),
+    path("device/<str:ip>/vitals/", views.device_vitals_ingest),
+]

@@ -1,0 +1,42 @@
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+build/
+coverage/
+.DS_Store
+*.log
+
+# Env (barcha papkalarda — faqat .env.example)
+**/.env
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python / backend
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/*.sqlite3
+backend/db.sqlite3
+backend/staticfiles/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/htmlcov/
+*.egg-info/
+.eggs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Vite
+.vite/

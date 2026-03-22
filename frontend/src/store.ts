@@ -1,0 +1,319 @@
+import { create } from 'zustand';
+
+import { getWebSocketMonitoringUrl } from './lib/api';
+
+export interface VitalSigns {
+  hr: number;
+  spo2: number;
+  nibpSys: number;
+  nibpDia: number;
+  rr: number;
+  temp: number;
+  nibpTime?: number;
+}
+
+export interface AlarmLimits {
+  hr: { low: number; high: number };
+  spo2: { low: number; high: number };
+  nibpSys: { low: number; high: number };
+  nibpDia: { low: number; high: number };
+  rr: { low: number; high: number };
+  temp: { low: number; high: number };
+}
+
+export interface AlarmState {
+  level: 'none' | 'blue' | 'yellow' | 'red' | 'purple';
+  message?: string;
+  patientId?: string;
+}
+
+export interface VitalHistory {
+  timestamp: number;
+  hr: number;
+  spo2: number;
+  nibpSys: number;
+  nibpDia: number;
+}
+
+export interface AiRisk {
+  probability: number;
+  estimatedTime: string;
+  reasons: string[];
+  recommendations: string[];
+}
+
+export interface Medication {
+  id: string;
+  name: string;
+  dose: string;
+  rate?: string;
+}
+
+export interface LabResult {
+  id: string;
+  name: string;
+  value: string;
+  unit: string;
+  time: number;
+  isAbnormal: boolean;
+}
+
+export interface ClinicalNote {
+  id: string;
+  text: string;
+  author: string;
+  time: number;
+}
+
+export interface PatientData {
+  id: string;
+  name: string;
+  room: string;
+  diagnosis: string;
+  doctor: string;
+  assignedNurse: string;
+  deviceBattery: number;
+  admissionDate: number;
+  vitals: VitalSigns;
+  alarm: AlarmState;
+  alarmLimits: AlarmLimits;
+  scheduledCheck?: {
+    intervalMs: number;
+    nextCheckTime: number;
+  };
+  aiRisk?: AiRisk;
+  history: VitalHistory[];
+  news2Score: number;
+  isPinned: boolean;
+  medications: Medication[];
+  labs: LabResult[];
+  notes: ClinicalNote[];
+}
+
+/** Single patient payload from `vitals_update` WebSocket messages. */
+export interface VitalsUpdatePayload {
+  id: string;
+  vitals: VitalSigns;
+  alarm: AlarmState;
+  alarmLimits?: AlarmLimits;
+  scheduledCheck?: PatientData['scheduledCheck'];
+  deviceBattery?: number;
+  aiRisk?: AiRisk;
+  history?: VitalHistory[];
+  news2Score?: number;
+  isPinned?: boolean;
+  medications?: Medication[];
+  labs?: LabResult[];
+  notes?: ClinicalNote[];
+}
+
+function sendWs(ws: WebSocket | null, payload: Record<string, unknown>) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+interface AppState {
+  patients: Record<string, PatientData>;
+  socket: WebSocket | null;
+  /** True when the WebSocket is open (Django Channels `/ws/monitoring/`). */
+  wsConnected: boolean;
+  privacyMode: boolean;
+  searchQuery: string;
+  selectedPatientId: string | null;
+  isAudioMuted: boolean;
+  togglePrivacyMode: () => void;
+  setSearchQuery: (q: string) => void;
+  setSelectedPatientId: (id: string | null) => void;
+  toggleAudioMute: () => void;
+  togglePinPatient: (patientId: string) => void;
+  addClinicalNote: (patientId: string, note: Omit<ClinicalNote, 'id' | 'time'>) => void;
+  acknowledgeAlarm: (patientId: string) => void;
+  setSchedule: (patientId: string, intervalMs: number) => void;
+  setAllSchedules: (intervalMs: number) => void;
+  clearAlarm: (patientId: string) => void;
+  updateLimits: (patientId: string, limits: Partial<AlarmLimits>) => void;
+  measureNibp: (patientId: string) => void;
+  admitPatient: (data: Partial<PatientData> & { bedId?: string }) => void;
+  dischargePatient: (patientId: string) => void;
+  connect: () => void;
+  disconnect: () => void;
+}
+
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let manualDisconnect = false;
+
+export const useStore = create<AppState>((set, get) => ({
+  patients: {},
+  socket: null,
+  wsConnected: false,
+  privacyMode: false,
+  searchQuery: '',
+  selectedPatientId: null,
+  isAudioMuted: false,
+
+  togglePrivacyMode: () => set((state) => ({ privacyMode: !state.privacyMode })),
+  setSearchQuery: (q) => set({ searchQuery: q }),
+  setSelectedPatientId: (id) => set({ selectedPatientId: id }),
+  toggleAudioMute: () => set((state) => ({ isAudioMuted: !state.isAudioMuted })),
+
+  togglePinPatient: (patientId) => {
+    sendWs(get().socket, { action: 'toggle_pin', patientId });
+  },
+  addClinicalNote: (patientId, note) => {
+    sendWs(get().socket, { action: 'add_note', patientId, note });
+  },
+  acknowledgeAlarm: (patientId) => {
+    sendWs(get().socket, { action: 'acknowledge_alarm', patientId });
+  },
+
+  setSchedule: (patientId, intervalMs) => {
+    sendWs(get().socket, { action: 'set_schedule', patientId, intervalMs });
+  },
+  setAllSchedules: (intervalMs) => {
+    sendWs(get().socket, { action: 'set_all_schedules', intervalMs });
+  },
+  clearAlarm: (patientId) => {
+    sendWs(get().socket, { action: 'clear_alarm', patientId });
+  },
+  updateLimits: (patientId, limits) => {
+    sendWs(get().socket, { action: 'update_limits', patientId, limits });
+  },
+  measureNibp: (patientId) => {
+    sendWs(get().socket, { action: 'measure_nibp', patientId });
+  },
+  admitPatient: (data) => {
+    sendWs(get().socket, { action: 'admit_patient', ...data });
+  },
+  dischargePatient: (patientId) => {
+    sendWs(get().socket, { action: 'discharge_patient', patientId });
+  },
+
+  connect: () => {
+    const existing = get().socket;
+    if (existing && existing.readyState === WebSocket.OPEN) return;
+
+    manualDisconnect = false;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    const ws = new WebSocket(getWebSocketMonitoringUrl());
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data) as {
+          type: string;
+          patients?: PatientData[];
+          updates?: VitalsUpdatePayload[];
+          patient?: PatientData;
+          patientId?: string;
+        };
+
+        if (msg.type === 'patient_refresh' && msg.patient) {
+          const full = msg.patient;
+          set((state) => ({
+            patients: { ...state.patients, [full.id]: full },
+          }));
+          return;
+        }
+
+        if (msg.type === 'initial_state' && msg.patients) {
+          const patientsMap = msg.patients.reduce(
+            (acc, p) => {
+              acc[p.id] = p;
+              return acc;
+            },
+            {} as Record<string, PatientData>,
+          );
+          set({ patients: patientsMap });
+          return;
+        }
+
+        if (msg.type === 'vitals_update' && msg.updates) {
+          set((state) => {
+            const newPatients = { ...state.patients };
+            msg.updates!.forEach((update) => {
+              if (newPatients[update.id]) {
+                const p = newPatients[update.id];
+                newPatients[update.id] = {
+                  ...p,
+                  vitals: update.vitals,
+                  alarm: update.alarm,
+                  alarmLimits: update.alarmLimits ?? p.alarmLimits,
+                  scheduledCheck: update.scheduledCheck,
+                  deviceBattery: update.deviceBattery ?? p.deviceBattery,
+                  aiRisk: update.aiRisk,
+                  history: update.history ?? p.history,
+                  news2Score: update.news2Score ?? p.news2Score,
+                  isPinned: update.isPinned ?? p.isPinned,
+                  medications: update.medications ?? p.medications,
+                  labs: update.labs ?? p.labs,
+                  notes: update.notes ?? p.notes,
+                };
+              }
+            });
+            return { patients: newPatients };
+          });
+          return;
+        }
+
+        if (msg.type === 'patient_admitted' && msg.patient) {
+          set((state) => ({
+            patients: { ...state.patients, [msg.patient!.id]: msg.patient! },
+          }));
+          return;
+        }
+
+        if (msg.type === 'patient_discharged' && msg.patientId) {
+          const patientId = msg.patientId;
+          set((state) => {
+            const newPatients = { ...state.patients };
+            delete newPatients[patientId];
+            return {
+              patients: newPatients,
+              selectedPatientId:
+                state.selectedPatientId === patientId ? null : state.selectedPatientId,
+            };
+          });
+        }
+      } catch (e) {
+        console.error('WebSocket message parse error:', e);
+      }
+    };
+
+    ws.onopen = () => {
+      set({ socket: ws, wsConnected: true });
+    };
+
+    ws.onerror = () => {
+      console.error('WebSocket error');
+    };
+
+    ws.onclose = () => {
+      set({ socket: null, wsConnected: false });
+      if (!manualDisconnect) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          get().connect();
+        }, 2500);
+      }
+    };
+
+    set({ socket: ws });
+  },
+
+  disconnect: () => {
+    manualDisconnect = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    const ws = get().socket;
+    if (ws) {
+      ws.close();
+    }
+    set({ socket: null, wsConnected: false });
+  },
+}));
