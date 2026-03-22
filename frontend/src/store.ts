@@ -21,6 +21,33 @@ export interface AlarmLimits {
   temp: { low: number; high: number };
 }
 
+/** API `{}` yoki qisman bo‘lsa ham — Signal chegaralari formasi uchun to‘liq obyekt. */
+export const DEFAULT_ALARM_LIMITS: AlarmLimits = {
+  hr: { low: 50, high: 120 },
+  spo2: { low: 90, high: 100 },
+  nibpSys: { low: 90, high: 160 },
+  nibpDia: { low: 50, high: 100 },
+  rr: { low: 8, high: 30 },
+  temp: { low: 35.5, high: 38.5 },
+};
+
+export function mergeAlarmLimits(raw: unknown): AlarmLimits {
+  const out: AlarmLimits = JSON.parse(JSON.stringify(DEFAULT_ALARM_LIMITS)) as AlarmLimits;
+  if (!raw || typeof raw !== 'object') return out;
+  const o = raw as Record<string, { low?: unknown; high?: unknown }>;
+  (Object.keys(out) as (keyof AlarmLimits)[]).forEach((key) => {
+    const patch = o[key as string];
+    if (patch && typeof patch === 'object') {
+      const low = Number(patch.low);
+      const high = Number(patch.high);
+      if (Number.isFinite(low) && Number.isFinite(high)) {
+        out[key] = { low, high };
+      }
+    }
+  });
+  return out;
+}
+
 export interface AlarmState {
   level: 'none' | 'blue' | 'yellow' | 'red' | 'purple';
   message?: string;

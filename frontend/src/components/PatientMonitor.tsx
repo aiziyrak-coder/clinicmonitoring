@@ -264,8 +264,8 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
           </div>
           {!isSmall && (
             <div className="flex justify-between text-[8px] text-emerald-500/50 font-mono shrink-0">
-              <span>{alarmLimits?.hr.low}</span>
-              <span>{alarmLimits?.hr.high}</span>
+              <span>{alarmLimits?.hr?.low ?? '—'}</span>
+              <span>{alarmLimits?.hr?.high ?? '—'}</span>
             </div>
           )}
         </div>
@@ -290,8 +290,8 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
           </div>
           {!isSmall && (
             <div className="flex justify-between text-[8px] text-cyan-500/50 font-mono shrink-0">
-              <span>{alarmLimits?.spo2.low}</span>
-              <span>{alarmLimits?.spo2.high}</span>
+              <span>{alarmLimits?.spo2?.low ?? '—'}</span>
+              <span>{alarmLimits?.spo2?.high ?? '—'}</span>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useMemo, useCallback, useLayoutEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { useModalDismiss } from '../hooks/useModalDismiss';
-import { useStore, AlarmLimits } from '../store';
+import { useStore, AlarmLimits, mergeAlarmLimits } from '../store';
 import { X, Download, Activity, Heart, Battery, UserCircle, Calendar, Stethoscope, UserMinus, Settings2, LineChart as ChartIcon, Save, AlertTriangle, Pill, FlaskConical, FileText, Plus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
@@ -127,14 +127,10 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
     setConfirmOpen(false);
   }, [patientId]);
 
-  React.useEffect(() => {
-    if (activeTab !== 'limits' || !patient?.alarmLimits) return;
-    try {
-      setLocalLimits(JSON.parse(JSON.stringify(patient.alarmLimits)) as AlarmLimits);
-    } catch (e) {
-      console.error("Failed to copy alarmLimits", e);
-    }
-  }, [activeTab, patientId, patient?.alarmLimits]);
+  React.useLayoutEffect(() => {
+    if (activeTab !== 'limits' || !patient) return;
+    setLocalLimits(mergeAlarmLimits(patient.alarmLimits));
+  }, [activeTab, patientId, patient?.alarmLimits, patient]);
 
   const chartData = useMemo(() => {
     if (!patient) return [];
@@ -403,8 +399,8 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                   <Heart className="w-5 h-5 mr-2 text-emerald-500" />
                   Tarixiy Trendlar (Oxirgi 5 daqiqa)
                 </h3>
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="w-full min-w-0 min-h-[256px] h-64 shrink-0">
+                  <ResponsiveContainer width="100%" height={256} debounce={80}>
                     <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
                       <XAxis dataKey="time" stroke="#a1a1aa" fontSize={12} tickMargin={10} />
@@ -428,7 +424,7 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                 Signal Chegaralarini Sozlash
               </h3>
               
-              {!localLimits && patient.alarmLimits && (
+              {!localLimits && (
                 <p className="text-sm text-zinc-500 mb-4">Chegaralar yuklanmoqda...</p>
               )}
 
