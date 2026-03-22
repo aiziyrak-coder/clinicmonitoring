@@ -1,6 +1,10 @@
-# MediCentral
+# ClinicMonitoring
 
 Monitoring ilovasi: **frontend** (Vite + React) va **backend** (Django REST Framework + Django Channels + Daphne).
+
+**GitHub:** [aiziyrak-coder/clinicmonitoring](https://github.com/aiziyrak-coder/clinicmonitoring)
+
+**Production:** `deploy/SERVER-SETUP.md` va `deploy/nginx-clinicmonitoring.conf`.
 
 ## Tuzilma
 
