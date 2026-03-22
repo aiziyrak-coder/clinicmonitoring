@@ -63,7 +63,7 @@ def _record_hl7_session(peer_ip: str, raws: list[bytes], ack_attempted: bool) ->
 
     close_old_connections()
     try:
-        dev = resolve_hl7_device_by_peer_ip(peer_ip)
+        dev = resolve_hl7_device_by_peer_ip(peer_ip, allow_nat_loopback=True)
         if dev:
             MonitorDevice.objects.filter(pk=dev.pk).update(last_hl7_rx_at_ms=now)
     finally:
@@ -293,7 +293,7 @@ def _should_send_connect_handshake(peer_ip: str) -> bool:
     """Qurilma `hl7_connect_handshake` bilan muhit ustidan chiqadi (None = muhit)."""
     from monitoring.device_integration import resolve_hl7_device_by_peer_ip
 
-    dev = resolve_hl7_device_by_peer_ip(peer_ip)
+    dev = resolve_hl7_device_by_peer_ip(peer_ip, allow_nat_loopback=False)
     if dev is not None and dev.hl7_connect_handshake is not None:
         return bool(dev.hl7_connect_handshake)
     return os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "false").lower() in (
@@ -354,6 +354,14 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
         raws, total_tcp_in = _recv_all_hl7_payloads(conn, peer_ip)
         if not raws:
+            from monitoring.device_integration import is_loopback_peer_ip
+
+            if is_loopback_peer_ip(peer_ip):
+                logger.debug(
+                    "HL7: loopback bo'sh sessiya (ehtimol port tekshiruvi) — diagnostika va NAT ga kiritilmadi peer=%s",
+                    peer_ip,
+                )
+                return
             _record_hl7_session(peer_ip, [], False)
             with HL7_DIAG_LOCK:
                 HL7_DIAG["lastEmptySessionTcpBytes"] = total_tcp_in
@@ -418,7 +426,7 @@ def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> Non
     )
     from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals_best
 
-    device = resolve_hl7_device_by_peer_ip(peer_ip)
+    device = resolve_hl7_device_by_peer_ip(peer_ip, allow_nat_loopback=True)
     if not device:
         logger.warning(
             "HL7: manzil mos kelmedi — ulanish manbasi: %s (xom: %s). "

@@ -125,6 +125,10 @@ class Command(BaseCommand):
                 "ip_address": dev_ip,
             },
         )
+        # Eski xato: probe NAT tufayli hl7_peer_ip=127.0.0.1 — haqiqiy monitor emas
+        if device.hl7_peer_ip in ("127.0.0.1", "::1"):
+            device.hl7_peer_ip = None
+            device.save(update_fields=["hl7_peer_ip"])
         # Yangi o'rnatishda: default K12 id uchun HL7 salom (migration ham mavjud qurilmalarni yangilaydi)
         if created and device_id == DEFAULT_DEVICE_ID and device.hl7_connect_handshake is None:
             device.hl7_connect_handshake = True

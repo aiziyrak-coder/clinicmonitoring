@@ -18,12 +18,28 @@ from monitoring.models import MonitorDevice, Patient, VitalHistoryEntry
 from monitoring.simulation import calculate_news2
 
 
-def resolve_hl7_device_by_peer_ip(peer_ip: str) -> MonitorDevice | None:
+def is_loopback_peer_ip(peer_ip: str) -> bool:
+    """127.0.0.1 / ::1 — mahalliy probe (connection-check), haqiqiy monitor emas."""
+    s = (peer_ip or "").strip()
+    if s in ("127.0.0.1", "::1"):
+        return True
+    if s.startswith("::ffff:") and s[7:].split("%", 1)[0] == "127.0.0.1":
+        return True
+    return False
+
+
+def resolve_hl7_device_by_peer_ip(
+    peer_ip: str, *, allow_nat_loopback: bool = False
+) -> MonitorDevice | None:
     """
     TCP manbai IP bo'yicha MonitorDevice topish.
     VPS + uy router NAT holatida server 192.168.x.x emas, tashqi IP ni ko'radi —
     shuning uchun ip_address/local_ip bilan mos kelmasligi mumkin.
     Yagona `hl7_enabled=True` qurilma bo'lsa (kichik klinika), peer_ip ni avto `hl7_peer_ip` ga yozadi.
+
+    Loopback (127.0.0.1) uchun NAT fallback odatda o'chiq — aks holda probe/texshiruv bitta
+    qurilmani noto'g'ri «onlayn» qiladi va hl7_peer_ip=127.0.0.1 yozadi.
+    Mahalliy HL7 sinovi uchun: allow_nat_loopback=True (faqat haqiqiy HL7 paket yo'lda).
     """
     dev = (
         MonitorDevice.objects.filter(hl7_enabled=True)
@@ -36,6 +52,9 @@ def resolve_hl7_device_by_peer_ip(peer_ip: str) -> MonitorDevice | None:
     )
     if dev:
         return dev
+
+    if is_loopback_peer_ip(peer_ip) and not allow_nat_loopback:
+        return None
 
     en = os.environ.get("HL7_NAT_SINGLE_DEVICE_FALLBACK", "true").lower()
     if en not in ("1", "true", "yes", "on"):
