@@ -62,6 +62,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
 
         try:
             from monitoring.hl7_listener import (
+                get_hl7_diagnostic_summary,
                 get_hl7_listen_config,
                 is_hl7_listener_alive,
                 probe_hl7_tcp_listening,
@@ -122,6 +123,19 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             elif not patient_on_bed:
                 warnings.append("Tanlangan joyda bemor yo'q — bemorni qabul qiling.")
 
+            hl7_diag = get_hl7_diagnostic_summary()
+            tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
+            has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
+            if (
+                hl7_enabled
+                and tcp_no_hl7 >= 2
+                and not has_hl7_bytes
+            ):
+                warnings.append(
+                    "HL7: TCP ulanishlar kuzatiladi, lekin serverga hech qanday HL7 bayt kelmagan "
+                    "(diag: tcpSessionsWithoutHl7Payload). Qurilma menyusida vitallarni yuborish (ORU/numerics) "
+                    "yoqilganini tekshiring; VPS bulut firewall da kiruvchi TCP 6006 ochiq ekanini tekshiring."
+                )
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts)
             pipeline_ok = bed_assigned and patient_on_bed
             data_flow_ok = last_ms is not None and is_receiving
@@ -163,6 +177,12 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         "threadAlive": thread_alive,
                         "localPortAcceptsConnections": port_accepts,
                     },
+                    "hl7Diagnostic": hl7_diag,
+                    "firewallHints": [
+                        "VPS (DigitalOcean / AWS / ...): Cloud → Firewall / Security Group → kiruvchi TCP 6006 ruxsat.",
+                        "Server: sudo ufw status verbose; kerak bo‘lsa: sudo ufw allow 6006/tcp && sudo ufw reload",
+                        "HL7 HTTPS (443) emas — monitor to‘g‘ri VPS tashqi IP:6006 ga TCP ulanadi.",
+                    ],
                     "assignment": {
                         "bedAssigned": bed_assigned,
                         "patientOnBed": patient_on_bed,
@@ -235,6 +255,15 @@ def device_from_screen(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def infrastructure(request):
+    from monitoring.hl7_listener import get_hl7_diagnostic_summary
+
+    hl7_extra = {
+        "hl7Diagnostic": get_hl7_diagnostic_summary(),
+        "firewallHints": [
+            "VPS: bulut panelida kiruvchi TCP 6006 (HL7) ochiq bo‘lsin.",
+            "sudo ufw allow 6006/tcp && sudo ufw reload",
+        ],
+    }
     if request.user.is_superuser:
         return Response(
             {
@@ -243,6 +272,7 @@ def infrastructure(request):
                 "beds": BedSerializer(Bed.objects.all(), many=True).data,
                 "devices": MonitorDeviceSerializer(MonitorDevice.objects.all(), many=True).data,
                 "geminiConfigured": _gemini_configured(),
+                **hl7_extra,
             }
         )
     clinic = get_clinic_for_user(request.user)
@@ -265,6 +295,7 @@ def infrastructure(request):
                 MonitorDevice.objects.filter(clinic=clinic), many=True
             ).data,
             "geminiConfigured": _gemini_configured(),
+            **hl7_extra,
         }
     )
 

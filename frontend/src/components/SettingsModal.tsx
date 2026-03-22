@@ -104,6 +104,8 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
     summary: string;
     warnings: string[];
     hl7: Record<string, unknown>;
+    hl7Diagnostic: Record<string, unknown>;
+    firewallHints: string[];
     assignment: { bedAssigned: boolean; patientOnBed: boolean };
     secondsSinceLastMessage: number | null;
     isReceivingData: boolean;
@@ -188,6 +190,11 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
         summary: String(data.summary ?? ''),
         warnings: Array.isArray(data.warnings) ? (data.warnings as string[]) : [],
         hl7: typeof data.hl7 === 'object' && data.hl7 !== null ? (data.hl7 as Record<string, unknown>) : {},
+        hl7Diagnostic:
+          typeof data.hl7Diagnostic === 'object' && data.hl7Diagnostic !== null
+            ? (data.hl7Diagnostic as Record<string, unknown>)
+            : {},
+        firewallHints: Array.isArray(data.firewallHints) ? (data.firewallHints as string[]) : [],
         assignment: {
           bedAssigned: Boolean((data.assignment as { bedAssigned?: boolean })?.bedAssigned),
           patientOnBed: Boolean((data.assignment as { patientOnBed?: boolean })?.patientOnBed),
@@ -619,7 +626,27 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   <span className="text-amber-400">ochiq emas</span>
                                 )}
                               </li>
+                              <li className="text-zinc-500">
+                                Server HL7 stat: TCP faqat (
+                                {String(connectionCheck.hl7Diagnostic.tcpSessionsWithoutHl7Payload ?? 0)}) · HL7
+                                bayt kelgan (
+                                {String(connectionCheck.hl7Diagnostic.tcpSessionsWithHl7Payload ?? 0)})
+                                {typeof connectionCheck.hl7Diagnostic.lastPayloadAtMs === 'number' && (
+                                  <span className="ml-1 font-mono">
+                                    · oxirgi HL7:{' '}
+                                    {new Date(
+                                      connectionCheck.hl7Diagnostic.lastPayloadAtMs as number,
+                                    ).toLocaleString()}
+                                  </span>
+                                )}
+                              </li>
                             </ul>
+                            {connectionCheck.firewallHints.length > 0 && (
+                              <p className="mt-2 text-xs text-zinc-500 border-t border-zinc-700/50 pt-2">
+                                <span className="font-semibold text-zinc-400">Firewall:</span>{' '}
+                                {connectionCheck.firewallHints.join(' ')}
+                              </p>
+                            )}
                             {connectionCheck.warnings.length > 0 && (
                               <ul className="mt-3 list-disc list-inside text-amber-200/90 space-y-1">
                                 {connectionCheck.warnings.map((w, i) => (

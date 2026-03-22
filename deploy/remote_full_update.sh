@@ -58,6 +58,17 @@ if ! systemctl is-active --quiet clinicmonitoring-daphne; then
   exit 1
 fi
 
+echo "=== ufw (HL7 TCP 6006 — tashqidan monitor ulanishi uchun) ==="
+if command -v ufw >/dev/null 2>&1; then
+  if ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw allow 6006/tcp comment "MediCentral HL7" || true
+  else
+    echo "ufw faol emas — bulut firewall (DO/AWS) da 6006 TCP ni qo'lda oching."
+  fi
+else
+  echo "ufw yo'q — server firewall / bulut xavfsizlik guruhida 6006 TCP ochiq ekanini tekshiring."
+fi
+
 echo "=== nginx ==="
 CERT_DIR="/etc/letsencrypt/live/clinicmonitoring.ziyrak.org"
 if [ -f "$CERT_DIR/fullchain.pem" ]; then

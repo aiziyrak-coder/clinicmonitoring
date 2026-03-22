@@ -16,6 +16,41 @@ logger = logging.getLogger(__name__)
 HL7_THREAD: threading.Thread | None = None
 HL7_LOCK = threading.Lock()
 
+# API / connection-check uchun: TCP bor lekin HL7 yozuv yo'q muammosini aniqlash
+HL7_DIAG_LOCK = threading.Lock()
+HL7_DIAG: dict[str, object] = {
+    "lastPayloadAtMs": None,
+    "lastPayloadPeer": None,
+    "lastPayloadTotalBytes": 0,
+    "lastAckAttempted": False,
+    "tcpSessionsWithHl7Payload": 0,
+    "tcpSessionsWithoutHl7Payload": 0,
+}
+
+
+def get_hl7_diagnostic_summary() -> dict[str, object]:
+    """Brauzer / API: server HL7 haqiqatan qabul qilyaptimi."""
+    with HL7_DIAG_LOCK:
+        return dict(HL7_DIAG)
+
+
+def _record_hl7_session(peer_ip: str, raws: list[bytes], ack_attempted: bool) -> None:
+    with HL7_DIAG_LOCK:
+        if not raws:
+            HL7_DIAG["tcpSessionsWithoutHl7Payload"] = (
+                int(HL7_DIAG.get("tcpSessionsWithoutHl7Payload") or 0) + 1
+            )
+            return
+        total = sum(len(r) for r in raws)
+        now = int(time.time() * 1000)
+        HL7_DIAG["lastPayloadAtMs"] = now
+        HL7_DIAG["lastPayloadPeer"] = peer_ip
+        HL7_DIAG["lastPayloadTotalBytes"] = total
+        HL7_DIAG["lastAckAttempted"] = ack_attempted
+        HL7_DIAG["tcpSessionsWithHl7Payload"] = (
+            int(HL7_DIAG.get("tcpSessionsWithHl7Payload") or 0) + 1
+        )
+
 
 def _normalize_peer_ip(ip: str) -> str:
     """
@@ -180,6 +215,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
         raws = _recv_all_hl7_payloads(conn)
         if not raws:
+            _record_hl7_session(peer_ip, [], False)
             logger.warning(
                 "HL7: %s dan HL7 yozuv kelmadi. Agar logda «recv — peer ulanishni uzdi» bo'lsa, "
                 "monitor TCP ni ochadi lekin ORU/OBX yubormaydi yoki serverdan javob kutadi (~20s) — "
@@ -190,10 +226,12 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
         from django.db import close_old_connections
 
+        ack_any = False
         for raw in raws:
             close_old_connections()
             try:
                 _send_mllp_ack_for_incoming(conn, raw)
+                ack_any = True
                 try:
                     text = raw.decode("utf-8", errors="replace")
                 except Exception:
@@ -201,6 +239,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
                 _process_hl7_text(text, raw, peer_ip, peer_raw)
             finally:
                 close_old_connections()
+        _record_hl7_session(peer_ip, raws, ack_any)
     except (ConnectionResetError, BrokenPipeError) as exc:
         logger.info("HL7: ulanish yopildi (peer) peer=%s: %s", peer_ip, exc)
     except OSError as exc:
