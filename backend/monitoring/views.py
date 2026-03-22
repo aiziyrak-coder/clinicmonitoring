@@ -126,15 +126,11 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             hl7_diag = get_hl7_diagnostic_summary()
             tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
             has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
-            if (
-                hl7_enabled
-                and tcp_no_hl7 >= 2
-                and not has_hl7_bytes
-            ):
+            if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
                 warnings.append(
-                    "HL7: TCP ulanishlar kuzatiladi, lekin serverga hech qanday HL7 bayt kelmagan "
-                    "(diag: tcpSessionsWithoutHl7Payload). Qurilma menyusida vitallarni yuborish (ORU/numerics) "
-                    "yoqilganini tekshiring; VPS bulut firewall da kiruvchi TCP 6006 ochiq ekanini tekshiring."
+                    "HL7: TCP bor, lekin HL7 paket hali kelmagan — qurilma menyusida vitallarni tarmoqka "
+                    "yuborish (ORU/numerics) yoqilganini tekshiring. Serverda HL7_SEND_CONNECT_HANDSHAKE=true "
+                    "(standart) yoki false sinab ko'ring. Bulut firewall da 6006 ochiq bo'lsa, asosan qurilma sozlamasi."
                 )
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts)
             pipeline_ok = bed_assigned and patient_on_bed

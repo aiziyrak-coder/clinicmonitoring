@@ -30,6 +30,9 @@ fi
 if ! grep -q "^MONITORING_SIMULATION_ENABLED=" .env 2>/dev/null; then
   echo "MONITORING_SIMULATION_ENABLED=false" >> .env
 fi
+if ! grep -q "^HL7_SEND_CONNECT_HANDSHAKE=" .env 2>/dev/null; then
+  echo "HL7_SEND_CONNECT_HANDSHAKE=true" >> .env
+fi
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput

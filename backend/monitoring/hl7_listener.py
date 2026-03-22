@@ -191,6 +191,46 @@ def _recv_all_hl7_payloads(conn: socket.socket, max_bytes: int = 1_048_576) -> l
     return out
 
 
+def _configure_accepted_socket(conn: socket.socket) -> None:
+    """Kechikishni kamaytirish va uzoq ulanish uchun TCP sozlamalari."""
+    try:
+        conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except OSError:
+        pass
+    try:
+        conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    except OSError:
+        pass
+
+
+def _maybe_send_connect_handshake(conn: socket.socket) -> bool:
+    """
+    Ba'zi bedside monitorlar (jumladan OEM/K12) TCP ochgach serverdan birinchi MLLP javobini kutadi.
+    Recv dan oldin yuboriladi — keyin qurilma ORU yuborishi mumkin.
+    Muammo bo'lsa .env da HL7_SEND_CONNECT_HANDSHAKE=false qiling.
+    """
+    if os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "true").lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return False
+    dt = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+    body = (
+        f"MSH|^~\\&|MediCentral|_|_|_|{dt}||ACK^R01^ACK|CONNHS|P|2.3\r"
+        f"MSA|AA|CONNHS|\r"
+    )
+    payload = b"\x0b" + body.encode("utf-8") + b"\x1c\x0d"
+    try:
+        conn.sendall(payload)
+        logger.info("HL7: ulanish handshake (MLLP) yuborildi — keyin qurilma javobi kutilmoqda")
+        return True
+    except OSError as exc:
+        logger.info("HL7: handshake yuborilmadi: %s", exc)
+        return False
+
+
 def _touch_device_online_on_connect(peer_ip: str) -> None:
     """TCP accept bo'lganda — HL7 tan o'qilishidan oldin qurilmani onlayn qilish."""
     from monitoring.device_integration import mark_device_online_only, resolve_hl7_device_by_peer_ip
@@ -212,6 +252,9 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             _touch_device_online_on_connect(peer_ip)
         finally:
             close_old_connections()
+
+        _configure_accepted_socket(conn)
+        _maybe_send_connect_handshake(conn)
 
         raws = _recv_all_hl7_payloads(conn)
         if not raws:
