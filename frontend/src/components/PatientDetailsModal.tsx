@@ -345,9 +345,11 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                 >
                   <p className="font-semibold text-cyan-200 mb-1">Vitallar hali kelmagan</p>
                   <p className="text-zinc-300">
-                    HL7 ulanishi bo‘lishi mumkin, lekin monitor OBX (YUCh, SpO2 va hokazo) yubormayapti —
-                    odatda sensorlar ulanmagan (masalan, ECG lead off, SpO2 yo‘q). Sensorlarni ulang yoki
-                    qurilma menyusida yuborilayotgan HL7 xabarlarini tekshiring.
+                    HL7 ulanishi bo‘lishi mumkin, lekin serverga OBX ichida YUCh/SpO2 kabi qiymatlar
+                    yetib kelmayapti — odatda sensorlar ulanmagan (masalan, ECG lead off, SpO2 yo‘q) yoki
+                    monitor HL7 da faqat xizmat xabarlarini yuboradi. Monitorda raqamlar ko‘rinib turib,
+                    bu yerda bo‘lmasa, serverda <span className="font-mono text-zinc-400">journalctl -u clinicmonitoring-daphne</span> da
+                    «HL7: vitallar ajratilmadi» / «vitallar qabul qilindi» qatorlarini tekshiring.
                   </p>
                 </div>
               )}

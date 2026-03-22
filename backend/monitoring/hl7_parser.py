@@ -268,6 +268,69 @@ def _text_skip_header_segments(text: str) -> str:
     return "\r".join(lines)
 
 
+def _harvest_obx_numeric_scan(text: str) -> dict[str, Any]:
+    """
+    OBX-3 noto'g'ri yoki bo'sh bo'lsa ham OBX qatorlaridagi raqamlarni yig'adi.
+    Alohida maydonlarda sys/dia (120 va 80) kabi juftliklarni NIBP deb ajratadi.
+    """
+    out: dict[str, Any] = {}
+    text = text.replace("\n", "\r")
+    hrs: list[int] = []
+    spos: list[int] = []
+    temps: list[float] = []
+
+    for line in text.split("\r"):
+        line = line.strip()
+        if not line or not re.match(r"^OBX\|", line, re.I):
+            continue
+        parts = line.split("|")
+        i = 5
+        n = min(len(parts), 36)
+        while i < n:
+            raw = parts[i].strip()
+            if not raw:
+                i += 1
+                continue
+            first = raw.split("^")[0].strip().replace(",", ".")
+            m = _NIBP_RE.match(first.replace(" ", ""))
+            if m:
+                out["nibpSys"] = int(m.group(1))
+                out["nibpDia"] = int(m.group(2))
+                i += 1
+                continue
+            if i + 1 < n:
+                a = _parse_float(parts[i].split("^")[0].strip().replace(",", "."))
+                b = _parse_float(parts[i + 1].split("^")[0].strip().replace(",", "."))
+                if a is not None and b is not None:
+                    ia, ib = int(round(a)), int(round(b))
+                    if 40 <= ia <= 250 and 30 <= ib <= 180 and ia >= ib:
+                        out["nibpSys"] = ia
+                        out["nibpDia"] = ib
+                        i += 2
+                        continue
+            fv = _parse_float(first)
+            if fv is None:
+                i += 1
+                continue
+            v = int(round(fv))
+            fvv = float(fv)
+            if 35 <= v <= 220:
+                hrs.append(v)
+            if 70 <= v <= 100:
+                spos.append(v)
+            if 30.0 <= fvv <= 43.0:
+                temps.append(round(fvv, 1))
+            i += 1
+
+    if hrs:
+        out.setdefault("hr", hrs[-1])
+    if spos:
+        out.setdefault("spo2", max(spos))
+    if temps:
+        out.setdefault("temp", temps[-1])
+    return out
+
+
 def _fallback_regex_scan(text: str) -> dict[str, Any]:
     """
     OBX maydonlari noto'g'ri bo'lsa: NIBP (sys/dia) va matndagi HR/SpO2 kalit so'zlari.
@@ -343,7 +406,7 @@ def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
 
     for line in text.split("\r"):
         line = line.strip()
-        if not line.upper().startswith("OBX|"):
+        if not re.match(r"^OBX\|", line, re.I):
             continue
         parts = line.split("|")
         _parse_one_obx_line(parts, out)
@@ -358,6 +421,10 @@ def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
     for k, v in reg.items():
         if k not in out:
             out[k] = v
+    harvest = _harvest_obx_numeric_scan(text)
+    for k, v in harvest.items():
+        if k not in out:
+            out[k] = v
 
     return out
 
@@ -367,6 +434,7 @@ def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     UTF-8, CP1251 va latin-1 bilan sinab, eng ko'p maydonni to'ldirgan natijani tanlaydi,
     qolgan kodlashlardan yetishmayotgan kalitlarni qo'shadi (bir xil xabarda aralash kodlash).
     """
+    raw = raw.lstrip(b"\xef\xbb\xbf")
     candidates: list[tuple[int, dict[str, Any]]] = []
     for enc in ("utf-8", "cp1251", "latin-1"):
         t = raw.decode(enc, errors="replace")
