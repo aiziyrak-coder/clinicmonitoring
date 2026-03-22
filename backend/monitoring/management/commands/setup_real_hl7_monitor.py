@@ -123,6 +123,19 @@ class Command(BaseCommand):
             "hl7_peer_ip": peer_ip,
         }
 
+        # UNIQUE(clinic, ip_address): boshqa qurilma shu IP ni egallagan bo'lsa — vaqtincha boshqa manzil
+        others = list(
+            MonitorDevice.objects.filter(clinic=clinic, ip_address=dev_ip).exclude(id=device_id)
+        )
+        for idx, o in enumerate(others):
+            o.ip_address = f"10.255.255.{240 + idx}"
+            o.save(update_fields=["ip_address"])
+            self.stdout.write(
+                self.style.WARNING(
+                    f"IP konflikt: {o.id} endi {o.ip_address} (K12 uchun {dev_ip} qoldirildi)"
+                )
+            )
+
         device, created = MonitorDevice.objects.update_or_create(
             id=device_id,
             defaults={
