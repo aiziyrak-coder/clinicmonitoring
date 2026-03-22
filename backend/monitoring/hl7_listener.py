@@ -4,6 +4,7 @@ Ba'zi monitorlar MLLP (0x0B…0x1C0x0D) yubormasligi mumkin — MSH segmenti bo'
 """
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import socket
@@ -53,17 +54,44 @@ def _peel_one_mllp_payload(buf: bytes) -> tuple[bytes | None, bytes]:
     return payload, remaining
 
 
+def _recv_hl7_chunk(conn: socket.socket) -> bytes:
+    """recv(); peer RST/FIN — xatolik emas, qolgan buffer qayta ishlanadi."""
+    try:
+        return conn.recv(8192)
+    except (ConnectionResetError, BrokenPipeError) as exc:
+        logger.info(
+            "HL7: recv — peer ulanishni uzdi (%s); qolgan buffer qayta ishlanadi",
+            exc,
+        )
+        return b""
+    except OSError as exc:
+        if exc.errno in (
+            errno.ECONNRESET,
+            errno.EPIPE,
+            errno.ETIMEDOUT,
+            10054,
+            10053,
+        ):  # WSAECONNRESET / WSAECONNABORTED (Windows)
+            logger.info(
+                "HL7: recv — socket yopildi (errno=%s); qolgan buffer qayta ishlanadi",
+                exc.errno,
+            )
+            return b""
+        raise
+
+
 def _recv_all_hl7_payloads(conn: socket.socket, max_bytes: int = 1_048_576) -> list[bytes]:
     """
     Bir ulanishdan bitta yoki bir nechta HL7 xabarlarni olish.
     Ba'zi qurilmalar avval ACK/heartbeat, keyin ORU^R01 yuboradi — bitta recv bilan faqat
     birinchi ramka o'qilsa vitallar yo'qoladi.
     MLLP bo'lmasa, yopilishda MSH| dan boshlab butun buffer bitta xabar sifatida olinadi.
+    Peer RST (Connection reset by peer) — recv xato emas; shu paytgacha kelgan baytlar saqlanadi.
     """
     buf = bytearray()
     out: list[bytes] = []
     while len(buf) < max_bytes:
-        chunk = conn.recv(8192)
+        chunk = _recv_hl7_chunk(conn)
         if not chunk:
             break
         buf += chunk
@@ -112,7 +140,9 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         raws = _recv_all_hl7_payloads(conn)
         if not raws:
             logger.warning(
-                "HL7: %s dan ma'lumot o'qilmadi (MLLP/MSH yo'q yoki bo'sh ulanish).",
+                "HL7: %s dan HL7 yozuv kelmadi. Agar logda «recv — peer ulanishni uzdi» bo'lsa, "
+                "monitor TCP ni ochadi lekin ORU/OBX yubormaydi yoki serverdan javob kutadi (~20s) — "
+                "qurilma HL7 chiqish rejimi va markaziy stansiya / «numerics» yuborishni tekshiring.",
                 peer_ip,
             )
             return
