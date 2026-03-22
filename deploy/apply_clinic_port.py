@@ -5,7 +5,7 @@ import sys
 
 import paramiko
 
-HOST = "167.71.53.238"
+HOST = os.environ.get("DEPLOY_HOST", "167.71.53.238")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FILES = [
     (os.path.join(ROOT, "clinicmonitoring-daphne.service"), "/etc/systemd/system/clinicmonitoring-daphne.service"),

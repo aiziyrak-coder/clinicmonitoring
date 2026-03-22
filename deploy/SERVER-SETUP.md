@@ -114,6 +114,23 @@ sudo ufw enable
 
 Monitor **Server IP** sifatida **167.71.53.238** (yoki tashqi IP), port **6006** — trafik serverga kelishi kerak.
 
+## 9. Masofadan to‘liq yangilash (bitta buyruq)
+
+Lokal mashinada `paramiko` o‘rnating: `pip install paramiko`.
+
+```powershell
+cd D:\medicentral   # yoki loyiha ildizi
+$env:SSH_PASSWORD = "server-root-paroli"
+python deploy/deploy_remote.py update
+```
+
+- **update** — `git pull` (origin/main), `migrate`, `collectstatic`, `ensure_fjsti_login`, frontend `npm ci` + `build`, **HTTPS bo‘lsa** `nginx-clinicmonitoring.conf`, Daphne **8012** qayta ishga tushadi.
+- **Birinchi o‘rnatish** (toza server, apt, redis, certbot): `python deploy/deploy_remote.py bootstrap`
+
+Eski skript nomlari: `ssh_finish.py` → `update`, `ssh_deploy.py` → `bootstrap`.
+
+`GEMINI_API_KEY` va boshqa maxfiy kalitlar faqat serverdagi `backend/.env` da qoladi — repoga kirmaydi.
+
 ---
 
 **Django admin CSS:** `collectstatic` + WhiteNoise `whitenoise.middleware.WhiteNoiseMiddleware` — nginx orqali `/static/` Daphne ga proksi qilingan (yuqoridagi konfig).

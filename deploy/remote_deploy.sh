@@ -96,7 +96,7 @@ systemctl restart clinicmonitoring-daphne
 
 # nginx: avval HTTP
 cp "$APP_ROOT/deploy/nginx-http-only.conf" /etc/nginx/sites-available/clinicmonitoring
-ln -sf /etc/nginx/sites-available/clinicmonitoring /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/clinicmonitoring /etc/nginx/sites-enabled/00-clinicmonitoring
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
@@ -109,12 +109,19 @@ ufw --force enable || true
 
 # HTTPS (DNS A yozuvlari server IP ga tushgan bo'lishi kerak)
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-admin@ziyrak.org}"
+CERT_DIR="/etc/letsencrypt/live/clinicmonitoring.ziyrak.org"
 if certbot --nginx -d clinicmonitoring.ziyrak.org -d clinicmonitoringapi.ziyrak.org \
   --non-interactive --agree-tos --email "$CERTBOT_EMAIL" --redirect 2>/tmp/certbot.log; then
   echo "certbot: HTTPS OK"
 else
   echo "certbot: xato (DNS / domen tekshiring). Log: /tmp/certbot.log"
   cat /tmp/certbot.log || true
+fi
+
+# Repodagi to'liq TLS konfig (certbot faylni aralashtirishi mumkin — bir xil yo'l bilan qayta yozamiz)
+if [ -f "$CERT_DIR/fullchain.pem" ]; then
+  cp "$APP_ROOT/deploy/nginx-clinicmonitoring.conf" /etc/nginx/sites-available/clinicmonitoring
+  nginx -t && systemctl reload nginx
 fi
 
 echo "=== Deploy tugadi ==="

@@ -4,7 +4,7 @@ Monitoring ilovasi: **frontend** (Vite + React) va **backend** (Django REST Fram
 
 **GitHub:** [aiziyrak-coder/clinicmonitoring](https://github.com/aiziyrak-coder/clinicmonitoring)
 
-**Production:** `deploy/SERVER-SETUP.md` va `deploy/nginx-clinicmonitoring.conf`.
+**Production:** `deploy/SERVER-SETUP.md` va `deploy/nginx-clinicmonitoring.conf`. Masofadan yangilash: `python deploy/deploy_remote.py update` (`paramiko`, `SSH_PASSWORD`).
 
 ## Tuzilma
 
