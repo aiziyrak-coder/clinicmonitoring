@@ -93,15 +93,17 @@ class Command(BaseCommand):
             id="fjsti",
             defaults={"name": "Farg'ona Jamoat Salomatligi Tibbiyot Instituti"},
         )
-        d1 = Department.objects.create(id="d1", name="Asosiy bo'lim", clinic=clinic)
-        r1 = Room.objects.create(id="r1", department=d1, name="Palata 1")
-        b1 = Bed.objects.create(id="b1", room=r1, name="Karavat 1")
+        dept = Department.objects.create(
+            id="cm_hl7_dept", name="HL7 monitoring (Creative K12)", clinic=clinic
+        )
+        room = Room.objects.create(id="cm_hl7_room", department=dept, name="Palata K12")
+        bed = Bed.objects.create(id="cm_hl7_bed", room=room, name="Karavat K12")
 
-        MonitorDevice.objects.create(**_real_hl7_monitor_kwargs(b1, clinic))
+        MonitorDevice.objects.create(**_real_hl7_monitor_kwargs(bed, clinic))
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Tayyor: 1 bo'lim, 1 xona, 1 karavat, 1 ta Creative Medical K12 (hl7_real). "
-                "Bemorlarni o'zingiz qo'shasiz."
+                "Tayyor: Creative Medical K12 (hl7_real) + karavat cm_hl7_bed. "
+                "Bemor: python manage.py setup_real_hl7_monitor"
             )
         )

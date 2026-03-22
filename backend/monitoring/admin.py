@@ -51,7 +51,20 @@ class UserProfileAdmin(admin.ModelAdmin):
 admin.site.register(Department)
 admin.site.register(Room)
 admin.site.register(Bed)
-admin.site.register(MonitorDevice)
+@admin.register(MonitorDevice)
+class MonitorDeviceAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "model",
+        "ip_address",
+        "local_ip",
+        "hl7_peer_ip",
+        "hl7_enabled",
+        "bed",
+        "status",
+    )
+    list_filter = ("clinic", "hl7_enabled", "status")
+    search_fields = ("id", "ip_address", "mac_address", "model")
 admin.site.register(Patient)
 admin.site.register(Medication)
 admin.site.register(LabResult)

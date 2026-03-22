@@ -59,7 +59,11 @@ def _touch_device_online_on_connect(peer_ip: str) -> None:
     from monitoring.models import MonitorDevice
 
     device = (
-        MonitorDevice.objects.filter(Q(ip_address=peer_ip) | Q(local_ip=peer_ip))
+        MonitorDevice.objects.filter(
+            Q(ip_address=peer_ip)
+            | Q(local_ip=peer_ip)
+            | Q(hl7_peer_ip=peer_ip)
+        )
         .filter(hl7_enabled=True)
         .first()
     )
@@ -116,7 +120,11 @@ def _process_hl7_text(text: str, peer_ip: str, peer_raw: str) -> None:
     from monitoring.models import MonitorDevice
 
     device = (
-        MonitorDevice.objects.filter(Q(ip_address=peer_ip) | Q(local_ip=peer_ip))
+        MonitorDevice.objects.filter(
+            Q(ip_address=peer_ip)
+            | Q(local_ip=peer_ip)
+            | Q(hl7_peer_ip=peer_ip)
+        )
         .filter(hl7_enabled=True)
         .first()
     )

@@ -30,6 +30,7 @@ fi
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py ensure_fjsti_login
+python manage.py setup_real_hl7_monitor
 chown -R www-data:www-data "$APP_ROOT/backend/data" 2>/dev/null || true
 
 echo "=== frontend ==="

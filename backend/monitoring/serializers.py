@@ -166,6 +166,13 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
         required=False,
         default="",
     )
+    hl7PeerIp = serializers.CharField(
+        source="hl7_peer_ip",
+        allow_blank=True,
+        allow_null=True,
+        required=False,
+        default="",
+    )
     subnetMask = serializers.CharField(
         source="subnet_mask", max_length=32, allow_blank=True, required=False, default=""
     )
@@ -185,6 +192,7 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "hl7Enabled",
             "hl7Port",
             "serverTargetIp",
+            "hl7PeerIp",
             "subnetMask",
             "gateway",
             "bedId",
@@ -212,6 +220,7 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         self._normalize_optional_ip(attrs, "local_ip", "localIp")
         self._normalize_optional_ip(attrs, "server_target_ip", "serverTargetIp")
+        self._normalize_optional_ip(attrs, "hl7_peer_ip", "hl7PeerIp")
 
         ip = attrs.get("ip_address")
         if ip is None and self.instance is not None:
@@ -255,6 +264,7 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "hl7Enabled": instance.hl7_enabled,
             "hl7Port": instance.hl7_port,
             "serverTargetIp": instance.server_target_ip,
+            "hl7PeerIp": instance.hl7_peer_ip,
             "subnetMask": instance.subnet_mask,
             "gateway": instance.gateway,
             "bedId": instance.bed_id,

@@ -70,6 +70,10 @@ if not re.search(r"^REDIS_URL=", t, re.M):
     t += "REDIS_URL=redis://127.0.0.1:6379/0\n"
 if not re.search(r"^DJANGO_SQLITE_PATH=", t, re.M):
     t += "DJANGO_SQLITE_PATH=" + APP_ROOT + "/backend/data/db.sqlite3\n"
+if re.search(r"^MONITORING_SIMULATION_ENABLED=", t, re.M):
+    t = re.sub(r"^MONITORING_SIMULATION_ENABLED=.*$", "MONITORING_SIMULATION_ENABLED=false", t, flags=re.M)
+else:
+    t += "MONITORING_SIMULATION_ENABLED=false\n"
 p.write_text(t, encoding="utf-8")
 print(".env updated")
 PY
@@ -78,6 +82,7 @@ export DJANGO_SQLITE_PATH="$APP_ROOT/backend/data/db.sqlite3"
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py ensure_fjsti_login
+python manage.py setup_real_hl7_monitor
 chown -R www-data:www-data "$APP_ROOT/backend/data" || true
 
 systemctl enable --now redis-server || true

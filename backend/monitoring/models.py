@@ -106,6 +106,12 @@ class MonitorDevice(models.Model):
         blank=True,
         help_text="Qurilmada 'Server IP' sifatida kiritilgan manzil (ma'lumot)",
     )
+    # NAT / internet orqali ulanishda TCP manbasi odatda lokal 192.168.x.x emas — server ko'radigan IP
+    hl7_peer_ip = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="Ixtiyoriy: server HL7 ulanishida ko'radigan manzil (NAT bo'lsa shu yerda). Bo'sh bo'lsa ip_address/local_ip ishlatiladi.",
+    )
     subnet_mask = models.CharField(max_length=32, blank=True, default="")
     gateway = models.CharField(max_length=64, blank=True, default="")
     bed = models.ForeignKey(Bed, null=True, blank=True, on_delete=models.SET_NULL, related_name="devices")

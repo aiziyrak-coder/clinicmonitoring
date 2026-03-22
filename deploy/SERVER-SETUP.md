@@ -110,9 +110,16 @@ sudo ufw allow 6006/tcp   # HL7 qurilmalar
 sudo ufw enable
 ```
 
-## 8. Qurilmalar
+## 8. Qurilmalar (HL7, Creative Medical K12)
 
-Monitor **Server IP** sifatida **167.71.53.238** (yoki tashqi IP), port **6006** — trafik serverga kelishi kerak.
+- **Server IP / port:** monitor menyusida server manzili (`167.71.53.238` yoki sizning VPS IP) va **6006**, **HL7 protocol** yoqilgan bo‘lsin.
+- **Baza:** deploydan keyin `python manage.py setup_real_hl7_monitor` avtomatik ishlaydi (real qurilma `hl7_real` + bemor `cm-k12-001`, karavat `cm_hl7_bed`). Ismni o‘zgartirish:  
+  `python manage.py setup_real_hl7_monitor --patient-name "Familiya Ism"`
+- **NAT / boshqa tarmoq:** server TCP manba IP sini **192.168.0.228** ko‘rmasa, `journalctl -u clinicmonitoring-daphne -n 40` da `HL7: manzil mos kelmedi` yoki `peer=` qatorini qiling; keyin:  
+  `python manage.py setup_real_hl7_monitor --peer-ip <shu_IP>` yoki Admin → MonitorDevice → **hl7_peer_ip**.
+- **Mock emas:** `.env` da `MONITORING_SIMULATION_ENABLED=false` (deploy skripti qo‘shadi).
+
+Firewall: **6006/tcp** ochiq bo‘lishi kerak (`ufw allow 6006/tcp`).
 
 ## 9. Masofadan to‘liq yangilash (bitta buyruq)
 
