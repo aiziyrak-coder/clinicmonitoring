@@ -32,11 +32,8 @@ python manage.py migrate
 Agar `table already exists` (eski `syncdb`): `python manage.py migrate --fake-initial`
 
 ```bash
-# Ixtiyoriy demo ma'lumot (faqat sinov uchun)
-# python manage.py seed_demo
-
-# Real test: barcha mock/demo yozuvlarni o'chirish
-# python manage.py clear_monitoring_data
+# HL7 real monitor: python manage.py setup_real_hl7_monitor
+# Barcha monitoring yozuvlarini tozalash: python manage.py clear_monitoring_data
 
 daphne -b 127.0.0.1 -p 8000 medicentral.asgi:application
 ```

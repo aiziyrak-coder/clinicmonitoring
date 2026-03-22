@@ -18,7 +18,7 @@ class MonitoringConfig(AppConfig):
             for x in ("migrate", "makemigrations", "collectstatic", "test", "shell")
         ):
             return
-        # manage.py buyruqlari (ensure_fjsti_login, seed_demo, ...) HL7 ni qayta ishga tushirmasin —
+        # manage.py buyruqlari (ensure_fjsti_login, migrate, ...) HL7 ni qayta ishga tushirmasin —
         # 6006 porti allaqachon Daphne jarayonida band bo'lishi mumkin.
         uses_manage = any(
             (a.endswith("manage.py") or a == "manage.py") for a in argv[:3]

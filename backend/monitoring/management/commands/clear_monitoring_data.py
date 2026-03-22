@@ -1,5 +1,5 @@
 """
-Barcha monitoring ma'lumotlarini o‘chirish (demo/seed dan keyin real test uchun).
+Barcha monitoring ma'lumotlarini o‘chirish (mahalliy testdan keyin tozalash uchun).
 """
 from django.core.management.base import BaseCommand
 from django.db import transaction
