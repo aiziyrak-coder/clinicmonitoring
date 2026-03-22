@@ -24,6 +24,10 @@ Muhit:
   APP_ROOT (default /opt/clinicmonitoring)
   DEPLOY_GEMINI_KEY — bo'sh bo'lmasa, deploydan keyin serverda backend/.env ga
   GEMINI_API_KEY yoziladi va Daphne qayta ishga tushiriladi (rasm tahlili).
+
+Faqat GEMINI (tez):
+  set DEPLOY_GEMINI_KEY=... && set SSH_PASSWORD=...
+  python deploy/deploy_remote.py gemini-inject
 """
 from __future__ import annotations
 
@@ -118,6 +122,11 @@ def main() -> None:
         print(__doc__)
         sys.exit(0)
 
+    gemini_only = False
+    if args and args[0] == "gemini-inject":
+        gemini_only = True
+        args.pop(0)
+
     mode = "update"
     if args and args[0] in SCRIPTS:
         mode = args.pop(0)
@@ -130,6 +139,24 @@ def main() -> None:
         print("  set SSH_PASSWORD=... && python deploy/deploy_remote.py update", file=sys.stderr)
         print("  python deploy/deploy_remote.py update YOUR_PASSWORD", file=sys.stderr)
         sys.exit(1)
+
+    if gemini_only:
+        key = os.environ.get("DEPLOY_GEMINI_KEY", "").strip()
+        if not key:
+            print("DEPLOY_GEMINI_KEY muhit o'zgaruvchisi kerak (kalitni repoga qo'ymang).", file=sys.stderr)
+            sys.exit(1)
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        print(f"Ulanmoqda {USER}@{HOST} — gemini-inject (backend/.env + Daphne restart)...")
+        client.connect(HOST, username=USER, password=password, timeout=60)
+        try:
+            _inject_gemini_and_restart(client)
+        except Exception as exc:
+            print(f"GEMINI inject: {exc}", file=sys.stderr)
+            client.close()
+            sys.exit(1)
+        client.close()
+        sys.exit(0)
 
     script_name = SCRIPTS[mode]
     script_path = Path(__file__).resolve().parent / script_name
