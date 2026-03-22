@@ -25,6 +25,10 @@ from monitoring.serializers import (
 )
 
 
+def _gemini_configured() -> bool:
+    return bool(os.environ.get("GEMINI_API_KEY", "").strip())
+
+
 class DepartmentViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
@@ -238,6 +242,7 @@ def infrastructure(request):
                 "rooms": RoomSerializer(Room.objects.all(), many=True).data,
                 "beds": BedSerializer(Bed.objects.all(), many=True).data,
                 "devices": MonitorDeviceSerializer(MonitorDevice.objects.all(), many=True).data,
+                "geminiConfigured": _gemini_configured(),
             }
         )
     clinic = get_clinic_for_user(request.user)
@@ -259,6 +264,7 @@ def infrastructure(request):
             "devices": MonitorDeviceSerializer(
                 MonitorDevice.objects.filter(clinic=clinic), many=True
             ).data,
+            "geminiConfigured": _gemini_configured(),
         }
     )
 

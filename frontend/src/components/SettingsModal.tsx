@@ -539,6 +539,32 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                       </div>
                     </div>
 
+                    {data.geminiConfigured !== true && (
+                      <div
+                        role="status"
+                        className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100"
+                      >
+                        <div className="font-bold text-amber-200 mb-1">GEMINI_API_KEY (rasm tahlili)</div>
+                        <p className="text-zinc-300 mb-2">
+                          «Qurilma qo&apos;shish» (ekran rasmi) uchun serverda{' '}
+                          <code className="text-emerald-400">GEMINI_API_KEY</code> bo&apos;lishi kerak — Google AI
+                          Studio kaliti.
+                        </p>
+                        <p className="text-zinc-400 text-xs font-mono">
+                          Masofadan:{' '}
+                          <span className="text-zinc-200">
+                            set DEPLOY_GEMINI_KEY=&lt;kalit&gt; &amp;&amp; set SSH_PASSWORD=... &amp;&amp; python
+                            deploy/deploy_remote.py update
+                          </span>
+                        </p>
+                        <p className="text-zinc-500 text-xs mt-2">
+                          Yoki serverda: <code>/opt/clinicmonitoring/backend/.env</code> —{' '}
+                          <code>GEMINI_API_KEY=...</code>, keyin{' '}
+                          <code>systemctl restart clinicmonitoring-daphne</code>
+                        </p>
+                      </div>
+                    )}
+
                     {connectionCheck && (
                       <div
                         role="status"

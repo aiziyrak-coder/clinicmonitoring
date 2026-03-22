@@ -145,6 +145,16 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
     }));
   }, [patient?.history]);
 
+  const noHl7VitalsYet = useMemo(() => {
+    if (!patient) return false;
+    const v = patient.vitals;
+    const h = patient.history || [];
+    const flat =
+      !v ||
+      ((v.hr || 0) === 0 && (v.spo2 || 0) === 0 && (v.nibpSys || 0) === 0);
+    return flat && h.length === 0;
+  }, [patient?.vitals, patient?.history]);
+
   if (!patient) return null;
 
   const maskedName = privacyMode
@@ -332,6 +342,19 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
           
           {activeTab === 'overview' ? (
             <>
+              {noHl7VitalsYet && (
+                <div
+                  role="status"
+                  className="rounded-xl border border-cyan-500/25 bg-cyan-950/40 p-4 text-sm text-cyan-100"
+                >
+                  <p className="font-semibold text-cyan-200 mb-1">Vitallar hali kelmagan</p>
+                  <p className="text-zinc-300">
+                    HL7 ulanishi bo‘lishi mumkin, lekin monitor OBX (YUCh, SpO2 va hokazo) yubormayapti —
+                    odatda sensorlar ulanmagan (masalan, ECG lead off, SpO2 yo‘q). Sensorlarni ulang yoki
+                    qurilma menyusida yuborilayotgan HL7 xabarlarini tekshiring.
+                  </p>
+                </div>
+              )}
               {/* Info Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-700/50">

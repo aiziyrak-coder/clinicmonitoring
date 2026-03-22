@@ -15,6 +15,9 @@ Muhit:
   SSH_PASSWORD yoki argv[1] — parol
   DEPLOY_HOST (default 167.71.53.238), DEPLOY_USER (default root)
   CERTBOT_EMAIL (default admin@ziyrak.org)
+  APP_ROOT (default /opt/clinicmonitoring)
+  DEPLOY_GEMINI_KEY — bo'sh bo'lmasa, deploydan keyin serverda backend/.env ga
+  GEMINI_API_KEY yoziladi va Daphne qayta ishga tushiriladi (rasm tahlili).
 """
 from __future__ import annotations
 
@@ -32,6 +35,7 @@ except ImportError:
 HOST = os.environ.get("DEPLOY_HOST", "167.71.53.238")
 USER = os.environ.get("DEPLOY_USER", "root")
 CERTBOT_EMAIL = os.environ.get("CERTBOT_EMAIL", "admin@ziyrak.org")
+APP_ROOT_DEFAULT = os.environ.get("APP_ROOT", "/opt/clinicmonitoring")
 
 SCRIPTS = {
     "bootstrap": "remote_deploy.sh",
@@ -47,6 +51,54 @@ def _configure_stdio() -> None:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+
+def _inject_gemini_and_restart(client: "paramiko.SSHClient") -> None:
+    """Serverda GEMINI_API_KEY ni .env ga yozadi va Daphne ni qayta ishga tushiradi."""
+    key = os.environ.get("DEPLOY_GEMINI_KEY", "").strip()
+    if not key:
+        return
+    app_root = os.environ.get("APP_ROOT", APP_ROOT_DEFAULT)
+    py = f"""import pathlib
+p = pathlib.Path({app_root!r}) / "backend" / ".env"
+key = {key!r}
+if not p.is_file():
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("", encoding="utf-8")
+t = p.read_text(encoding="utf-8")
+lines = t.splitlines()
+out = []
+found = False
+for line in lines:
+    if line.startswith("GEMINI_API_KEY="):
+        out.append("GEMINI_API_KEY=" + key)
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append("GEMINI_API_KEY=" + key)
+p.write_text("\\n".join(out) + "\\n", encoding="utf-8")
+print("GEMINI_API_KEY backend/.env ga yozildi")
+"""
+    stdin, stdout, stderr = client.exec_command("python3 -", timeout=120)
+    stdin.write(py)
+    stdin.close()
+    out = stdout.read().decode()
+    err = stderr.read().decode()
+    print(out, end="")
+    if err.strip():
+        print(err, file=sys.stderr)
+    if stdout.channel.recv_exit_status() != 0:
+        print("GEMINI .env yozishda xato", file=sys.stderr)
+        return
+    stdin2, stdout2, stderr2 = client.exec_command(
+        "systemctl restart clinicmonitoring-daphne && sleep 2 && systemctl is-active clinicmonitoring-daphne",
+        timeout=60,
+    )
+    print(stdout2.read().decode(), end="")
+    e2 = stderr2.read().decode()
+    if e2.strip():
+        print(e2, file=sys.stderr)
 
 
 def main() -> None:
@@ -88,7 +140,7 @@ def main() -> None:
 
     cmd = (
         f"export CERTBOT_EMAIL={shlex.quote(CERTBOT_EMAIL)}; "
-        f"export APP_ROOT={shlex.quote(os.environ.get('APP_ROOT', '/opt/clinicmonitoring'))}; "
+        f"export APP_ROOT={shlex.quote(os.environ.get('APP_ROOT', APP_ROOT_DEFAULT))}; "
         f"bash {shlex.quote(remote_sh)}"
     )
     print("Ishga tushmoqda (bir necha daqiqa bo'lishi mumkin)...")
@@ -101,6 +153,11 @@ def main() -> None:
     if err.strip():
         print(err, file=sys.stderr)
     code = stdout.channel.recv_exit_status()
+    if code == 0:
+        try:
+            _inject_gemini_and_restart(client)
+        except Exception as exc:
+            print(f"GEMINI inject: {exc}", file=sys.stderr)
     client.close()
     if code != 0:
         print(f"Exit code: {code}", file=sys.stderr)

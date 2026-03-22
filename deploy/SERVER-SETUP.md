@@ -138,6 +138,11 @@ Eski skript nomlari: `ssh_finish.py` → `update`, `ssh_deploy.py` → `bootstra
 
 `GEMINI_API_KEY` va boshqa maxfiy kalitlar faqat serverdagi `backend/.env` da qoladi — repoga kirmaydi.
 
+**Rasm orqali qurilma (Gemini Vision):** [Google AI Studio](https://aistudio.google.com/apikey) dan kalit oling. Serverda:
+
+- `nano /opt/clinicmonitoring/backend/.env` → `GEMINI_API_KEY=...` qatorini qo‘shing, keyin `sudo systemctl restart clinicmonitoring-daphne`
+- yoki masofadan: `set DEPLOY_GEMINI_KEY=<kalit>` va `set SSH_PASSWORD=...` sozlab `python deploy/deploy_remote.py update` — kalit `.env` ga yoziladi va Daphne qayta ishga tushadi.
+
 ---
 
 **Django admin CSS:** `collectstatic` + WhiteNoise `whitenoise.middleware.WhiteNoiseMiddleware` — nginx orqali `/static/` Daphne ga proksi qilingan (yuqoridagi konfig).
