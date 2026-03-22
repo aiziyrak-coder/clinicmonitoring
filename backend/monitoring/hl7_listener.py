@@ -100,7 +100,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
         close_old_connections()
         try:
-            _process_hl7_text(text, peer_ip, peer_raw)
+            _process_hl7_text(text, raw, peer_ip, peer_raw)
         finally:
             close_old_connections()
     except Exception:
@@ -112,11 +112,11 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             pass
 
 
-def _process_hl7_text(text: str, peer_ip: str, peer_raw: str) -> None:
+def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> None:
     from django.db.models import Q
 
     from monitoring.device_integration import apply_vitals_payload, mark_device_online_only
-    from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals
+    from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals_best
     from monitoring.models import MonitorDevice
 
     device = (
@@ -138,7 +138,7 @@ def _process_hl7_text(text: str, peer_ip: str, peer_raw: str) -> None:
         )
         return
 
-    vitals = parse_hl7_vitals(text)
+    vitals = parse_hl7_vitals_best(raw)
     if vitals:
         apply_vitals_payload(device, vitals, mark_online=True)
         logger.info(

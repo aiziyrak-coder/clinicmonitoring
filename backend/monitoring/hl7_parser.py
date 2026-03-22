@@ -28,8 +28,26 @@ def _norm_obx3_id(field: str) -> str:
 
 def _classify_obx3(field: str) -> str | None:
     nid = _norm_obx3_id(field)
-    blob = nid.replace("|", " ")
-    for token in blob.split():
+    blob = nid.replace("|", " ").lower()
+    # Rus / kirill: ЧСС (yurak urishi), ЧПС ba'zan noto'g'ri, SpO2
+    if any(
+        x in blob
+        for x in (
+            "чсс",
+            "чпс",
+            "пульс",
+            "пульсокс",
+            "сердеч",
+            "chss",
+            "chps",
+            "css",
+        )
+    ):
+        return "hr"
+    if any(x in blob for x in ("спо2", "spo2", "сатурац", "кислород", "насыщ")):
+        return "spo2"
+    blob_ascii = nid.replace("|", " ")
+    for token in blob_ascii.split():
         t = token.strip().lower()
         if t in _LOINC_HR or "heart" in blob or "pulse" in blob or blob.startswith("8867"):
             return "hr"
@@ -76,15 +94,19 @@ def _parse_float(s: str) -> float | None:
 
 def _heuristic_kind_from_value(v: int, out: dict[str, Any]) -> str | None:
     """
-    OBX-3 noma'lum bo'lganda: SpO2 odatda 70–100, YUCh 35–220.
-    Avval SpO2 diapazoni (98 kabi qiymatlar HR ga tushib qolmasin).
+    OBX-3 noma'lum bo'lganda. 70–84 oralig'i HR (masalan 72) ham, SpO2 ham bo'lishi mumkin —
+    SpO2 uchun avval 85+ (monitorlar odatan 90+).
     """
+    if (35 <= v <= 69) or (101 <= v <= 220):
+        return "hr"
+    if 85 <= v <= 100 and "spo2" not in out:
+        return "spo2"
+    if 70 <= v <= 84 and "hr" not in out:
+        return "hr"
     if 70 <= v <= 100 and "spo2" not in out:
         return "spo2"
     if 35 <= v <= 220 and "hr" not in out:
         return "hr"
-    if 50 <= v <= 100 and "spo2" not in out:
-        return "spo2"
     return None
 
 
@@ -174,6 +196,67 @@ def _fallback_ordered_obx(text: str) -> dict[str, Any]:
     return out
 
 
+def _sequential_obx_numeric_fallback(text: str) -> dict[str, Any]:
+    """
+    OBX-3 tavsifi tushunarsiz bo'lsa ham OBX-5 raqamlaridan YUCh va SpO2.
+    Ikki qiymat: SpO2 odatan 70–100 ichida yuqori (98), HR pastki (72).
+    Bitta qiymat 72 kabi: SpO2 kamdan-kam <85 — HR deb olinadi.
+    """
+    out: dict[str, Any] = {}
+    sequence: list[int] = []
+    for line in text.replace("\n", "\r").split("\r"):
+        line = line.strip()
+        if not line.upper().startswith("OBX|"):
+            continue
+        parts = line.split("|")
+        if len(parts) < 6:
+            continue
+        val = _extract_obx_value(parts)
+        if not val or _NIBP_RE.match(val.replace(" ", "")):
+            continue
+        fv = _parse_float(val)
+        if fv is None:
+            continue
+        v = int(round(fv))
+        if 25 <= v <= 250:
+            sequence.append(v)
+    if not sequence:
+        return out
+
+    in_spo = [v for v in sequence if 70 <= v <= 100]
+    strict_spo = [v for v in sequence if 85 <= v <= 100]
+
+    if len(sequence) >= 2 and in_spo:
+        out["spo2"] = max(in_spo)
+        for v in sequence:
+            if 35 <= v <= 220 and v != out["spo2"]:
+                out["hr"] = v
+                break
+        return out
+
+    if len(sequence) == 1:
+        v = sequence[0]
+        if 35 <= v <= 69 or 101 <= v <= 220:
+            out["hr"] = v
+        elif 70 <= v <= 100:
+            if v >= 92:
+                out["spo2"] = v
+            else:
+                out["hr"] = v
+        return out
+
+    if strict_spo:
+        out["spo2"] = strict_spo[0]
+    elif in_spo:
+        out["spo2"] = max(in_spo)
+    spo2_val = out.get("spo2")
+    for v in sequence:
+        if 35 <= v <= 220 and v != spo2_val:
+            out["hr"] = v
+            break
+    return out
+
+
 def _text_skip_header_segments(text: str) -> str:
     """MSH/PID/PV1 qatorlarida vaqt/ID raqamlari HR/SpO2 bilan aralashmasin."""
     lines: list[str] = []
@@ -208,6 +291,14 @@ def _fallback_regex_scan(text: str) -> dict[str, Any]:
         v = int(hr_m.group(1))
         if 35 <= v <= 220:
             out["hr"] = v
+    hr_cyr = re.search(
+        r"(?:ЧСС|ЧПС|CHSS|CHPS)[^|\d]{0,32}(\d{2,3})\b",
+        body,
+    )
+    if hr_cyr and "hr" not in out:
+        v = int(hr_cyr.group(1))
+        if 35 <= v <= 220:
+            out["hr"] = v
     spo2_m = re.search(
         r"(?:SPO2|SAO2|O2\s*SAT|OXYGEN\s*SAT)[^|\d]{0,24}(\d{2,3})\b",
         body,
@@ -215,6 +306,15 @@ def _fallback_regex_scan(text: str) -> dict[str, Any]:
     )
     if spo2_m:
         v = int(spo2_m.group(1))
+        if 70 <= v <= 100:
+            out["spo2"] = v
+    spo2_cyr = re.search(
+        r"(?:СПО2|СПО\s*2|SpO2)[^|\d]{0,32}(\d{2,3})\b",
+        body,
+        re.IGNORECASE,
+    )
+    if spo2_cyr and "spo2" not in out:
+        v = int(spo2_cyr.group(1))
         if 70 <= v <= 100:
             out["spo2"] = v
 
@@ -250,7 +350,25 @@ def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
 
     if not out:
         out = _fallback_ordered_obx(text)
-    if not out:
-        out = _fallback_regex_scan(text)
+    seq = _sequential_obx_numeric_fallback(text)
+    for k, v in seq.items():
+        if k not in out:
+            out[k] = v
+    reg = _fallback_regex_scan(text)
+    for k, v in reg.items():
+        if k not in out:
+            out[k] = v
 
     return out
+
+
+def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
+    """
+    UTF-8 va keyin CP1251 (Rus firmware) bilan sinab, eng to'liq vitallarni qaytaradi.
+    """
+    t_utf = raw.decode("utf-8", errors="replace")
+    v = parse_hl7_vitals(t_utf)
+    if v:
+        return v
+    t_cp = raw.decode("cp1251", errors="replace")
+    return parse_hl7_vitals(t_cp)
