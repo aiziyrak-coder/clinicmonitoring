@@ -646,6 +646,21 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   </span>
                                 )}
                               </li>
+                              {connectionCheck.hl7Diagnostic.lastEmptySessionTcpBytes != null && (
+                                <li className="text-zinc-500 text-xs mt-1">
+                                  Oxirgi bo&apos;sh HL7 sessiya: TCP qabul{' '}
+                                  <span className="font-mono text-zinc-400">
+                                    {String(connectionCheck.hl7Diagnostic.lastEmptySessionTcpBytes)}
+                                  </span>{' '}
+                                  bayt — peer{' '}
+                                  <span className="font-mono">
+                                    {String(connectionCheck.hl7Diagnostic.lastEmptySessionPeer ?? '—')}
+                                  </span>
+                                  {Number(connectionCheck.hl7Diagnostic.lastEmptySessionTcpBytes) === 0
+                                    ? ' (qurilma yubormagan yoki darhol yopilgan)'
+                                    : ' (MSH topilmadi — format yoki kodlash)'}
+                                </li>
+                              )}
                               {typeof connectionCheck.hl7Diagnostic.lastTcpRawBytesHex === 'string' &&
                                 connectionCheck.hl7Diagnostic.lastTcpRawBytesHex.length > 0 && (
                                   <li className="text-amber-200/85 text-xs mt-1 break-all">

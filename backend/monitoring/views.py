@@ -146,12 +146,25 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             hl7_diag = get_hl7_diagnostic_summary()
             tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
             has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
+            last_empty_tcp = hl7_diag.get("lastEmptySessionTcpBytes")
+            if hl7_enabled and hl7_rx_ms is None and last_empty_tcp is not None:
+                try:
+                    empty_n = int(last_empty_tcp)
+                except (TypeError, ValueError):
+                    empty_n = -1
+                if empty_n == 0:
+                    warnings.append(
+                        "Oxirgi HL7 bo'sh sessiya: TCP qabul=0 bayt — qurilma yubormagan yoki ulanishni darhol yopgan. "
+                        "«HL7 salom» ni O'chirish bilan sinab ko'ring; ORU/markaziy stansiya chiqishini menyuda tekshiring."
+                    )
+                elif empty_n > 0:
+                    warnings.append(
+                        f"Oxirgi sessiya: TCP {empty_n} bayt keldi, lekin MSH/HL7 ajratilmadi — "
+                        "boshqa freyming yoki kodlash. .env: HL7_LOG_FIRST_RECV_HEX=true, keyin journalctl."
+                    )
             if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
                 warnings.append(
-                    "HL7: TCP bor, lekin HL7 paket hali kelmagan — qurilma menyusida vitallarni tarmoqga "
-                    "yuborish (ORU/numerics) yoqilganini tekshiring. Serverda HL7_SEND_CONNECT_HANDSHAKE "
-                    "odatda o'chiq; ba'zi qurilmalar uchun true sinab ko'ring. Diagnostika: backend .env da "
-                    "HL7_LOG_RAW_TCP_RECV=true va journalctl -u clinicmonitoring-daphne."
+                    "HL7: bir nechta TCP sessiya HL7 paketsiz — VPS firewall 6006 va qurilma ORU chiqishini tekshiring."
                 )
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts and not be)
             pipeline_ok = bed_assigned and patient_on_bed

@@ -28,6 +28,8 @@ HL7_DIAG: dict[str, object] = {
     "lastTcpRawBytesHex": None,
     "lastTcpRawPeer": None,
     "bindError": None,
+    "lastEmptySessionTcpBytes": None,
+    "lastEmptySessionPeer": None,
 }
 
 
@@ -220,7 +222,7 @@ def _maybe_log_tcp_raw_diagnostic(peer_ip: str, tail: bytes) -> None:
 
 def _recv_all_hl7_payloads(
     conn: socket.socket, peer_ip: str, max_bytes: int = 1_048_576
-) -> list[bytes]:
+) -> tuple[list[bytes], int]:
     """
     Bir ulanishdan bitta yoki bir nechta HL7 xabarlarni olish.
     Ba'zi qurilmalar avval ACK/heartbeat, keyin ORU^R01 yuboradi — bitta recv bilan faqat
@@ -231,10 +233,12 @@ def _recv_all_hl7_payloads(
     buf = bytearray()
     out: list[bytes] = []
     first_chunk_logged = False
+    total_recv_bytes = 0
     while len(buf) < max_bytes:
         chunk = _recv_hl7_chunk(conn)
         if not chunk:
             break
+        total_recv_bytes += len(chunk)
         if not first_chunk_logged:
             first_chunk_logged = True
             if os.environ.get("HL7_LOG_FIRST_RECV_HEX", "").lower() in (
@@ -261,7 +265,7 @@ def _recv_all_hl7_payloads(
 
     tail = bytes(buf)
     if not tail:
-        return out
+        return out, total_recv_bytes
     msh = _find_msh_in_buffer(tail)
     if msh != -1:
         # MLLP boshlanmagan (yoki yopuvchi 0x1C0x0D yetib kelmagan) qoldiq
@@ -270,7 +274,7 @@ def _recv_all_hl7_payloads(
             out.append(lone)
     else:
         _maybe_log_tcp_raw_diagnostic(peer_ip, tail)
-    return out
+    return out, total_recv_bytes
 
 
 def _configure_accepted_socket(conn: socket.socket) -> None:
@@ -348,15 +352,25 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         _configure_accepted_socket(conn)
         _maybe_send_connect_handshake(conn, peer_ip)
 
-        raws = _recv_all_hl7_payloads(conn, peer_ip)
+        raws, total_tcp_in = _recv_all_hl7_payloads(conn, peer_ip)
         if not raws:
             _record_hl7_session(peer_ip, [], False)
-            logger.warning(
-                "HL7: %s dan HL7 yozuv kelmadi. Agar logda «recv — peer ulanishni uzdi» bo'lsa, "
-                "monitor TCP ni ochadi lekin ORU/OBX yubormaydi yoki serverdan javob kutadi (~20s) — "
-                "qurilma HL7 chiqish rejimi va markaziy stansiya / «numerics» yuborishni tekshiring.",
-                peer_ip,
-            )
+            with HL7_DIAG_LOCK:
+                HL7_DIAG["lastEmptySessionTcpBytes"] = total_tcp_in
+                HL7_DIAG["lastEmptySessionPeer"] = peer_ip
+            if total_tcp_in == 0:
+                logger.warning(
+                    "HL7: %s — ulanish yopildi, TCP qabul=0 bayt. Qurilma yubormagan yoki darhol FIN/RST; "
+                    "handshake «O'chirish» ni sinab ko'ring; qurilma ORU menyusini tekshiring.",
+                    peer_ip,
+                )
+            else:
+                logger.warning(
+                    "HL7: %s — HL7/MSH ajratilmadi, lekin TCP qabul=%s bayt (format/kodlash boshqacha bo'lishi mumkin). "
+                    ".env: HL7_LOG_RAW_TCP_RECV=true yoki HL7_LOG_FIRST_RECV_HEX=true.",
+                    peer_ip,
+                    total_tcp_in,
+                )
             return
 
         from django.db import close_old_connections
