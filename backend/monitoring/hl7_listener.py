@@ -29,6 +29,47 @@ def _normalize_peer_ip(ip: str) -> str:
 _MLLP_ENDS = (b"\x1c\x0d", b"\x1c\x0a")
 
 
+def _extract_msh10_message_control_id(hl7_text: str) -> str:
+    """MSH-10 (message control id) — ACK uchun."""
+    for line in hl7_text.replace("\n", "\r").split("\r"):
+        line = line.strip()
+        if not line.startswith("MSH|"):
+            continue
+        parts = line.split("|")
+        if len(parts) > 9:
+            cid = parts[9].strip()
+            if cid:
+                return cid.split("^")[0].strip()
+    return ""
+
+
+def _send_mllp_ack_for_incoming(conn: socket.socket, incoming_raw: bytes) -> None:
+    """
+    HL7 qabul qiluvchi ilova ORU yuborgan qurilmaga MSA|AA ACK qaytarishi kerak.
+    Ba'zi monitorlar javobsiz qolsa keyingi ma'lumot yubormaydi yoki TCP ni RST bilan yopadi.
+    """
+    if os.environ.get("HL7_SEND_ACK", "true").lower() not in ("1", "true", "yes", "on"):
+        return
+    try:
+        text = incoming_raw.decode("utf-8", errors="replace")
+    except Exception:
+        return
+    if "MSH|" not in text:
+        return
+    msg_id = _extract_msh10_message_control_id(text) or "UNKNOWN"
+    dt = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+    ack_body = (
+        f"MSH|^~\\&|MediCentral|MediCentral|Monitor|_|{dt}||ACK^R01^ACK|{msg_id}|P|2.3\r"
+        f"MSA|AA|{msg_id}|\r"
+    )
+    payload = b"\x0b" + ack_body.encode("utf-8") + b"\x1c\x0d"
+    try:
+        conn.sendall(payload)
+        logger.info("HL7: MLLP ACK yuborildi (MSA|AA) msg_id=%s", msg_id)
+    except OSError as exc:
+        logger.info("HL7: ACK yuborib bo'lmadi: %s", exc)
+
+
 def _peel_one_mllp_payload(buf: bytes) -> tuple[bytes | None, bytes]:
     """
     Birinchi to'liq MLLP ramkasini ajratadi: 0x0B … 0x1C 0x0D yoki … 0x1C 0x0A.
@@ -152,6 +193,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         for raw in raws:
             close_old_connections()
             try:
+                _send_mllp_ack_for_incoming(conn, raw)
                 try:
                     text = raw.decode("utf-8", errors="replace")
                 except Exception:
@@ -159,6 +201,19 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
                 _process_hl7_text(text, raw, peer_ip, peer_raw)
             finally:
                 close_old_connections()
+    except (ConnectionResetError, BrokenPipeError) as exc:
+        logger.info("HL7: ulanish yopildi (peer) peer=%s: %s", peer_ip, exc)
+    except OSError as exc:
+        if exc.errno in (
+            errno.ECONNRESET,
+            errno.EPIPE,
+            errno.ETIMEDOUT,
+            10054,
+            10053,
+        ):
+            logger.info("HL7: socket yopildi peer=%s errno=%s", peer_ip, exc.errno)
+        else:
+            logger.exception("HL7 ulanish OSError peer=%s", peer_ip)
     except Exception:
         logger.exception("HL7 ulanish xatolik peer=%s", peer_ip)
     finally:

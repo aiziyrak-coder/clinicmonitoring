@@ -218,7 +218,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   connect: () => {
     const existing = get().socket;
-    if (existing && existing.readyState === WebSocket.OPEN) return;
+    if (
+      existing &&
+      (existing.readyState === WebSocket.OPEN ||
+        existing.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
 
     manualDisconnect = false;
     if (reconnectTimer) {
