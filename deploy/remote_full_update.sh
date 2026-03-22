@@ -26,6 +26,10 @@ export DJANGO_SQLITE_PATH="$APP_ROOT/backend/data/db.sqlite3"
 if [ ! -f .env ]; then
   cp .env.example .env
 fi
+# Real HL7 uchun mock odatda o'chiq (agar .env da qator bo'lmasa)
+if ! grep -q "^MONITORING_SIMULATION_ENABLED=" .env 2>/dev/null; then
+  echo "MONITORING_SIMULATION_ENABLED=false" >> .env
+fi
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
