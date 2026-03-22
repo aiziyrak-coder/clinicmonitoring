@@ -230,10 +230,26 @@ def _recv_all_hl7_payloads(
     """
     buf = bytearray()
     out: list[bytes] = []
+    first_chunk_logged = False
     while len(buf) < max_bytes:
         chunk = _recv_hl7_chunk(conn)
         if not chunk:
             break
+        if not first_chunk_logged:
+            first_chunk_logged = True
+            if os.environ.get("HL7_LOG_FIRST_RECV_HEX", "").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ):
+                prev = chunk[:160]
+                logger.info(
+                    "HL7: birinchi TCP recv peer=%s len=%s hex=%s",
+                    peer_ip,
+                    len(chunk),
+                    prev.hex(),
+                )
         buf += chunk
         while True:
             msg, rest = _peel_one_mllp_payload(bytes(buf))
@@ -269,19 +285,28 @@ def _configure_accepted_socket(conn: socket.socket) -> None:
         pass
 
 
-def _maybe_send_connect_handshake(conn: socket.socket) -> bool:
-    """
-    Ba'zi bedside monitorlar (jumladan OEM/K12) TCP ochgach serverdan birinchi MLLP javobini kutadi.
-    Recv dan oldin yuboriladi — keyin qurilma ORU yuborishi mumkin.
-    Standart: o'chiq — ko'p monitorlar birinchi ORU ni o'zi yuboradi; serverdan oldin
-    yuborilgan ACK ba'zi qurilmalarni buzadi. Kerak bo'lsa: HL7_SEND_CONNECT_HANDSHAKE=true
-    """
-    if os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "false").lower() not in (
+def _should_send_connect_handshake(peer_ip: str) -> bool:
+    """Qurilma `hl7_connect_handshake` bilan muhit ustidan chiqadi (None = muhit)."""
+    from monitoring.device_integration import resolve_hl7_device_by_peer_ip
+
+    dev = resolve_hl7_device_by_peer_ip(peer_ip)
+    if dev is not None and dev.hl7_connect_handshake is not None:
+        return bool(dev.hl7_connect_handshake)
+    return os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "false").lower() in (
         "1",
         "true",
         "yes",
         "on",
-    ):
+    )
+
+
+def _maybe_send_connect_handshake(conn: socket.socket, peer_ip: str) -> bool:
+    """
+    Ba'zi bedside monitorlar (jumladan OEM/K12) TCP ochgach serverdan birinchi MLLP javobini kutadi.
+    Recv dan oldin yuboriladi — keyin qurilma ORU yuborishi mumkin.
+    Qurilma ro'yxatida «HL7 salom» (hl7ConnectHandshake) yoki muhit HL7_SEND_CONNECT_HANDSHAKE.
+    """
+    if not _should_send_connect_handshake(peer_ip):
         return False
     dt = time.strftime("%Y%m%d%H%M%S", time.gmtime())
     body = (
@@ -321,7 +346,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             close_old_connections()
 
         _configure_accepted_socket(conn)
-        _maybe_send_connect_handshake(conn)
+        _maybe_send_connect_handshake(conn, peer_ip)
 
         raws = _recv_all_hl7_payloads(conn, peer_ip)
         if not raws:

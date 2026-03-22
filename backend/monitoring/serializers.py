@@ -180,6 +180,11 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
     bedId = serializers.PrimaryKeyRelatedField(
         queryset=Bed.objects.all(), source="bed", allow_null=True, required=False
     )
+    hl7ConnectHandshake = serializers.BooleanField(
+        source="hl7_connect_handshake",
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = MonitorDevice
@@ -198,9 +203,9 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "bedId",
             "status",
             "last_seen",
-            "last_hl7_rx_at_ms",
+            "hl7ConnectHandshake",
         ]
-        read_only_fields = ["id", "status", "last_seen", "last_hl7_rx_at_ms"]
+        read_only_fields = ["id", "status", "last_seen"]
 
     def _normalize_optional_ip(self, attrs: dict[str, Any], key: str, api_key: str) -> None:
         if key not in attrs:
@@ -272,6 +277,7 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "status": instance.status,
             "lastSeen": instance.last_seen,
             "lastHl7RxAtMs": instance.last_hl7_rx_at_ms,
+            "hl7ConnectHandshake": instance.hl7_connect_handshake,
         }
 
 

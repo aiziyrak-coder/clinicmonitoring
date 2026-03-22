@@ -122,6 +122,11 @@ class MonitorDevice(models.Model):
         blank=True,
         help_text="HL7 paket (MSH+) qabul qilingan vaqt (Unix ms). Faqat haqiqiy HL7 ma'lumot.",
     )
+    hl7_connect_handshake = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="None: HL7_SEND_CONNECT_HANDSHAKE muhiti; True: ulanishda MLLP salom (ba'zi K12); False: yubormaslik.",
+    )
 
     class Meta:
         ordering = ["model"]

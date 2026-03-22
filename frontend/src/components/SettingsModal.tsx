@@ -98,6 +98,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   const [error, setError] = useState<string | null>(null);
   const [checkingDeviceId, setCheckingDeviceId] = useState<string | null>(null);
   const [markingOnlineId, setMarkingOnlineId] = useState<string | null>(null);
+  const [handshakeSavingId, setHandshakeSavingId] = useState<string | null>(null);
   const [connectionCheck, setConnectionCheck] = useState<{
     deviceId: string;
     allOk: boolean;
@@ -705,6 +706,50 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   HL7 :{device.hl7Port ?? 6006}
                                   {device.serverTargetIp ? ` → ${device.serverTargetIp}` : ""}
                                 </div>
+                                {device.hl7Enabled !== false && (
+                                  <label className="block mt-2 text-[10px] text-zinc-500 leading-tight">
+                                    HL7 salom (handshake)
+                                    <select
+                                      className="mt-0.5 w-full max-w-[12rem] bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-zinc-300 text-[10px]"
+                                      value={
+                                        device.hl7ConnectHandshake === null ||
+                                        device.hl7ConnectHandshake === undefined
+                                          ? 'inherit'
+                                          : device.hl7ConnectHandshake
+                                            ? 'on'
+                                            : 'off'
+                                      }
+                                      onChange={async (e) => {
+                                        const v = e.target.value;
+                                        const body =
+                                          v === 'inherit'
+                                            ? { hl7ConnectHandshake: null }
+                                            : { hl7ConnectHandshake: v === 'on' };
+                                        setHandshakeSavingId(device.id);
+                                        setError(null);
+                                        try {
+                                          const res = await authedFetch(`/api/devices/${device.id}/`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify(body),
+                                          });
+                                          if (!res.ok) throw new Error("Saqlanmadi");
+                                          await fetchData();
+                                        } catch (err) {
+                                          console.error(err);
+                                          setError("HL7 salom sozlamasi saqlanmadi");
+                                        } finally {
+                                          setHandshakeSavingId(null);
+                                        }
+                                      }}
+                                      disabled={handshakeSavingId === device.id}
+                                    >
+                                      <option value="inherit">Muhit (.env)</option>
+                                      <option value="on">Yoqish (K12 tavsiya)</option>
+                                      <option value="off">O&apos;chirish</option>
+                                    </select>
+                                  </label>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 {device.bedId ? (

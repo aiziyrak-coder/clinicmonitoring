@@ -125,6 +125,10 @@ class Command(BaseCommand):
                 "ip_address": dev_ip,
             },
         )
+        # Yangi o'rnatishda: default K12 id uchun HL7 salom (migration ham mavjud qurilmalarni yangilaydi)
+        if created and device_id == DEFAULT_DEVICE_ID and device.hl7_connect_handshake is None:
+            device.hl7_connect_handshake = True
+            device.save(update_fields=["hl7_connect_handshake"])
 
         now_ms = int(time.time() * 1000)
         patient_id = options["patient_id"]
