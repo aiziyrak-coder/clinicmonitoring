@@ -11,6 +11,9 @@ Birinchi marta (apt, redis, clone, certbot):
 Keyingi yangilanishlar (git pull, migrate, frontend, nginx TLS, Daphne):
   python deploy/deploy_remote.py update
 
+HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
+  python deploy/deploy_remote.py hl7-debug
+
 Muhit:
   SSH_PASSWORD yoki argv[1] — parol
   DEPLOY_HOST (default 167.71.53.238), DEPLOY_USER (default root)
@@ -40,6 +43,7 @@ APP_ROOT_DEFAULT = os.environ.get("APP_ROOT", "/opt/clinicmonitoring")
 SCRIPTS = {
     "bootstrap": "remote_deploy.sh",
     "update": "remote_full_update.sh",
+    "hl7-debug": "remote_hl7_debug.sh",
 }
 
 
