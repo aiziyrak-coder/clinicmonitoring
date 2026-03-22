@@ -25,6 +25,8 @@ HL7_DIAG: dict[str, object] = {
     "lastAckAttempted": False,
     "tcpSessionsWithHl7Payload": 0,
     "tcpSessionsWithoutHl7Payload": 0,
+    "lastTcpRawBytesHex": None,
+    "lastTcpRawPeer": None,
 }
 
 
@@ -130,10 +132,39 @@ def _peel_one_mllp_payload(buf: bytes) -> tuple[bytes | None, bytes]:
     return payload, remaining
 
 
+# UTF-16 HL7 (ba'zi OEM monitorlar)
+_MSH_UTF16_LE = b"M\x00S\x00H\x00|\x00"
+_MSH_UTF16_BE = b"\x00\x4d\x00\x53\x00\x48\x00\x7c"
+
+
+def _find_msh_in_buffer(buf: bytes) -> int:
+    """MSH segment boshlanishi — UTF-8 yoki UTF-16 LE/BE."""
+    for needle in (b"MSH|", _MSH_UTF16_LE, _MSH_UTF16_BE):
+        i = buf.find(needle)
+        if i != -1:
+            return i
+    return -1
+
+
+def _apply_connection_recv_timeout(conn: socket.socket) -> None:
+    """0 yoki bo'sh = cheksiz kutish (birinchi ORU kechikishi mumkin)."""
+    raw = os.environ.get("HL7_RECV_TIMEOUT_SEC", "0").strip()
+    if not raw or raw == "0":
+        conn.settimeout(None)
+        return
+    try:
+        conn.settimeout(float(raw))
+    except ValueError:
+        conn.settimeout(None)
+
+
 def _recv_hl7_chunk(conn: socket.socket) -> bytes:
     """recv(); peer RST/FIN — xatolik emas, qolgan buffer qayta ishlanadi."""
     try:
         return conn.recv(8192)
+    except TimeoutError:
+        logger.info("HL7: recv — vaqt tugadi (HL7_RECV_TIMEOUT_SEC); qolgan buffer qayta ishlanadi")
+        return b""
     except (ConnectionResetError, BrokenPipeError) as exc:
         logger.info(
             "HL7: recv — peer ulanishni uzdi (%s); qolgan buffer qayta ishlanadi",
@@ -156,7 +187,27 @@ def _recv_hl7_chunk(conn: socket.socket) -> bytes:
         raise
 
 
-def _recv_all_hl7_payloads(conn: socket.socket, max_bytes: int = 1_048_576) -> list[bytes]:
+def _maybe_log_tcp_raw_diagnostic(peer_ip: str, tail: bytes) -> None:
+    """MSH topilmasa — xom baytlarni (PHI!) faqat ixtiyoriy log."""
+    if os.environ.get("HL7_LOG_RAW_TCP_RECV", "").lower() not in ("1", "true", "yes", "on"):
+        return
+    if not tail:
+        return
+    preview = tail[:96]
+    with HL7_DIAG_LOCK:
+        HL7_DIAG["lastTcpRawPeer"] = peer_ip
+        HL7_DIAG["lastTcpRawBytesHex"] = preview.hex()
+    logger.warning(
+        "HL7 diag: MSH yo'q — peer=%s len=%s hex=%s",
+        peer_ip,
+        len(tail),
+        preview.hex(),
+    )
+
+
+def _recv_all_hl7_payloads(
+    conn: socket.socket, peer_ip: str, max_bytes: int = 1_048_576
+) -> list[bytes]:
     """
     Bir ulanishdan bitta yoki bir nechta HL7 xabarlarni olish.
     Ba'zi qurilmalar avval ACK/heartbeat, keyin ORU^R01 yuboradi — bitta recv bilan faqat
@@ -182,12 +233,14 @@ def _recv_all_hl7_payloads(conn: socket.socket, max_bytes: int = 1_048_576) -> l
     tail = bytes(buf)
     if not tail:
         return out
-    msh = tail.find(b"MSH|")
+    msh = _find_msh_in_buffer(tail)
     if msh != -1:
         # MLLP boshlanmagan (yoki yopuvchi 0x1C0x0D yetib kelmagan) qoldiq
         lone = tail[msh:]
         if lone:
             out.append(lone)
+    else:
+        _maybe_log_tcp_raw_diagnostic(peer_ip, tail)
     return out
 
 
@@ -207,9 +260,10 @@ def _maybe_send_connect_handshake(conn: socket.socket) -> bool:
     """
     Ba'zi bedside monitorlar (jumladan OEM/K12) TCP ochgach serverdan birinchi MLLP javobini kutadi.
     Recv dan oldin yuboriladi — keyin qurilma ORU yuborishi mumkin.
-    Muammo bo'lsa .env da HL7_SEND_CONNECT_HANDSHAKE=false qiling.
+    Standart: o'chiq — ko'p monitorlar birinchi ORU ni o'zi yuboradi; serverdan oldin
+    yuborilgan ACK ba'zi qurilmalarni buzadi. Kerak bo'lsa: HL7_SEND_CONNECT_HANDSHAKE=true
     """
-    if os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "true").lower() not in (
+    if os.environ.get("HL7_SEND_CONNECT_HANDSHAKE", "false").lower() not in (
         "1",
         "true",
         "yes",
@@ -256,7 +310,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         _configure_accepted_socket(conn)
         _maybe_send_connect_handshake(conn)
 
-        raws = _recv_all_hl7_payloads(conn)
+        raws = _recv_all_hl7_payloads(conn, peer_ip)
         if not raws:
             _record_hl7_session(peer_ip, [], False)
             logger.warning(
@@ -365,7 +419,7 @@ def _serve_loop(host: str, port: int) -> None:
     while True:
         try:
             conn, addr = srv.accept()
-            conn.settimeout(120.0)
+            _apply_connection_recv_timeout(conn)
             t = threading.Thread(
                 target=_handle_connection,
                 args=(conn, addr),

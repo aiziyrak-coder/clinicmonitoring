@@ -30,8 +30,14 @@ fi
 if ! grep -q "^MONITORING_SIMULATION_ENABLED=" .env 2>/dev/null; then
   echo "MONITORING_SIMULATION_ENABLED=false" >> .env
 fi
-if ! grep -q "^HL7_SEND_CONNECT_HANDSHAKE=" .env 2>/dev/null; then
-  echo "HL7_SEND_CONNECT_HANDSHAKE=true" >> .env
+if ! grep -q "^HL7_RECV_TIMEOUT_SEC=" .env 2>/dev/null; then
+  echo "HL7_RECV_TIMEOUT_SEC=0" >> .env
+fi
+# Eski default handshake=true ba'zi monitorlarda serverdan oldin yuborilgan MLLP ulanishni buzadi — false
+if grep -q "^HL7_SEND_CONNECT_HANDSHAKE=true" .env 2>/dev/null; then
+  cp -a .env .env.bak_handshake 2>/dev/null || cp .env .env.bak_handshake
+  sed -i 's/^HL7_SEND_CONNECT_HANDSHAKE=true$/HL7_SEND_CONNECT_HANDSHAKE=false/' .env
+  echo "HL7_SEND_CONNECT_HANDSHAKE=false ga yangilandi (backup: .env.bak_handshake). Kerak bo'lsa qo'lda true qiling."
 fi
 
 python manage.py migrate --noinput

@@ -458,9 +458,15 @@ def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     qolgan kodlashlardan yetishmayotgan kalitlarni qo'shadi (bir xil xabarda aralash kodlash).
     """
     raw = raw.lstrip(b"\xef\xbb\xbf")
+    if raw.startswith(b"\xff\xfe"):
+        raw = raw[2:]
+    elif raw.startswith(b"\xfe\xff"):
+        raw = raw[2:]
     candidates: list[tuple[int, dict[str, Any]]] = []
-    for enc in ("utf-8", "cp1251", "latin-1", "gbk"):
+    for enc in ("utf-8", "utf-16-le", "utf-16-be", "cp1251", "latin-1", "gbk"):
         try:
+            if enc in ("utf-16-le", "utf-16-be") and len(raw) % 2 == 1:
+                continue
             t = raw.decode(enc, errors="replace")
         except LookupError:
             continue

@@ -128,9 +128,10 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
             if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
                 warnings.append(
-                    "HL7: TCP bor, lekin HL7 paket hali kelmagan — qurilma menyusida vitallarni tarmoqka "
-                    "yuborish (ORU/numerics) yoqilganini tekshiring. Serverda HL7_SEND_CONNECT_HANDSHAKE=true "
-                    "(standart) yoki false sinab ko'ring. Bulut firewall da 6006 ochiq bo'lsa, asosan qurilma sozlamasi."
+                    "HL7: TCP bor, lekin HL7 paket hali kelmagan — qurilma menyusida vitallarni tarmoqga "
+                    "yuborish (ORU/numerics) yoqilganini tekshiring. Serverda HL7_SEND_CONNECT_HANDSHAKE "
+                    "odatda o'chiq; ba'zi qurilmalar uchun true sinab ko'ring. Diagnostika: backend .env da "
+                    "HL7_LOG_RAW_TCP_RECV=true va journalctl -u clinicmonitoring-daphne."
                 )
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts)
             pipeline_ok = bed_assigned and patient_on_bed

@@ -640,6 +640,14 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   </span>
                                 )}
                               </li>
+                              {typeof connectionCheck.hl7Diagnostic.lastTcpRawBytesHex === 'string' &&
+                                connectionCheck.hl7Diagnostic.lastTcpRawBytesHex.length > 0 && (
+                                  <li className="text-amber-200/85 text-xs mt-1 break-all">
+                                    MSH yo‘q, lekin TCP bayt kelgan (hex qisqa):{' '}
+                                    {String(connectionCheck.hl7Diagnostic.lastTcpRawBytesHex).slice(0, 64)}
+                                    … — server .env: <span className="font-mono">HL7_LOG_RAW_TCP_RECV=true</span>
+                                  </li>
+                                )}
                             </ul>
                             {connectionCheck.firewallHints.length > 0 && (
                               <p className="mt-2 text-xs text-zinc-500 border-t border-zinc-700/50 pt-2">
