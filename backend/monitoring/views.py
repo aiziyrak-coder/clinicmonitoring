@@ -64,6 +64,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             from monitoring.hl7_listener import (
                 get_hl7_diagnostic_summary,
                 get_hl7_listen_config,
+                get_hl7_listener_status,
                 is_hl7_listener_alive,
                 probe_hl7_tcp_listening,
             )
@@ -73,13 +74,22 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             hl7_host, hl7_port, hl7_enabled = get_hl7_listen_config()
             thread_alive = is_hl7_listener_alive()
             port_accepts = probe_hl7_tcp_listening()
+            hl7_status = get_hl7_listener_status()
 
-            last_ms = device.last_seen
+            last_seen_ms = device.last_seen
+            hl7_rx_ms = device.last_hl7_rx_at_ms
             seconds_since: float | None = None
             is_receiving = False
-            if last_ms is not None:
-                seconds_since = max(0.0, (now_ms - last_ms) / 1000.0)
-                is_receiving = seconds_since <= threshold_sec
+            if hl7_enabled:
+                ref_ms = hl7_rx_ms
+                if ref_ms is not None:
+                    seconds_since = max(0.0, (now_ms - ref_ms) / 1000.0)
+                    is_receiving = seconds_since <= threshold_sec
+            else:
+                ref_ms = last_seen_ms
+                if last_seen_ms is not None:
+                    seconds_since = max(0.0, (now_ms - last_seen_ms) / 1000.0)
+                    is_receiving = seconds_since <= threshold_sec
 
             bed_assigned = device.bed_id is not None
             patient_on_bed = (
@@ -97,25 +107,35 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 warnings.append(
                     f"Serverda {hl7_port}-port ochiq emas yoki band — firewall va HL7_LISTEN_PORT ni tekshiring."
                 )
-            if last_ms is None:
-                warnings.append(
-                    "Bu qurilma manzilidan hali ma'lumot kelmagan (HL7 yoki REST vitals)."
-                )
-                warnings.append(
-                    "Monitor 'Server IP' sifatida ko'rsatilgan manzil "
-                    "shu kompyuterning haqiqiy LAN/Wi‑Fi manzili bo'lishi kerak; Windows Firewall "
-                    "uchun kiruvchi qoida: TCP "
-                    + str(hl7_port)
-                    + " (python/daphne jarayoni)."
-                )
-                warnings.append(
-                    "HL7 paket manbasi ro'yxatdagi lokal IP bilan mos kelishi kerak. "
-                    "Boshqa IP chiqsa backend logida 'manzil mos kelmedi' yozuvi bo'ladi."
-                )
-            elif not is_receiving:
-                warnings.append(
-                    f"Oxirgi ma'lumot {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
-                )
+            be = hl7_status.get("bindError")
+            if hl7_enabled and be:
+                warnings.append(f"HL7 port bog'lanmadi (bind): {be}")
+            if hl7_enabled:
+                if hl7_rx_ms is None:
+                    warnings.append(
+                        "HL7: serverda bu qurilma uchun hali HL7 paket (MSH) qabul qilinmagan — "
+                        "«onlayn» ko'rinishi TCP ulanishidan bo'lishi mumkin, vitallar emas."
+                    )
+                    warnings.append(
+                        "Qurilma menyusida ORU/numerics/markaziy stansiya chiqishini tekshiring; "
+                        "manzil VPS tashqi IP:" + str(hl7_port) + " (HTTPS emas)."
+                    )
+                elif not is_receiving:
+                    warnings.append(
+                        f"Oxirgi HL7 paket {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
+                    )
+            else:
+                if last_seen_ms is None:
+                    warnings.append(
+                        "Bu qurilma manzilidan hali ma'lumot kelmagan (REST vitals)."
+                    )
+                    warnings.append(
+                        "Monitor tarmoq manzili va REST yo'l uchun firewall ni tekshiring."
+                    )
+                elif not is_receiving:
+                    warnings.append(
+                        f"Oxirgi ma'lumot {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
+                    )
             if not bed_assigned:
                 warnings.append(
                     "Qurilma joy (bed) ga biriktirilmagan — vitallar bemorga yozilmaydi."
@@ -133,9 +153,12 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     "odatda o'chiq; ba'zi qurilmalar uchun true sinab ko'ring. Diagnostika: backend .env da "
                     "HL7_LOG_RAW_TCP_RECV=true va journalctl -u clinicmonitoring-daphne."
                 )
-            server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts)
+            server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts and not be)
             pipeline_ok = bed_assigned and patient_on_bed
-            data_flow_ok = last_ms is not None and is_receiving
+            if hl7_enabled:
+                data_flow_ok = hl7_rx_ms is not None and is_receiving
+            else:
+                data_flow_ok = last_seen_ms is not None and is_receiving
             all_ok = bool(server_listen_ok and pipeline_ok and data_flow_ok)
 
             summary_parts: list[str] = []
@@ -143,12 +166,20 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 summary_parts.append("HL7 server tinglayapti.")
             elif not hl7_enabled:
                 summary_parts.append("HL7 o'chirilgan (faqat REST vitals).")
-            if last_ms is None:
-                summary_parts.append("Ma'lumot hali kelmagan.")
-            elif is_receiving:
-                summary_parts.append("Ma'lumot oqimi yaxshi (chegara ichida).")
+            if hl7_enabled:
+                if hl7_rx_ms is None:
+                    summary_parts.append("HL7 jismoniy paket hali kelmagan.")
+                elif is_receiving:
+                    summary_parts.append("HL7 ma'lumot oqimi yaxshi (chegara ichida).")
+                else:
+                    summary_parts.append("HL7 ma'lumot kechikmoqda yoki to'xtagan.")
             else:
-                summary_parts.append("Ma'lumot kechikmoqda yoki to'xtagan.")
+                if last_seen_ms is None:
+                    summary_parts.append("Ma'lumot hali kelmagan.")
+                elif is_receiving:
+                    summary_parts.append("Ma'lumot oqimi yaxshi (chegara ichida).")
+                else:
+                    summary_parts.append("Ma'lumot kechikmoqda yoki to'xtagan.")
             if pipeline_ok:
                 summary_parts.append("Joy va bemor biriktirilgan.")
             else:
@@ -161,7 +192,9 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     "deviceId": device.id,
                     "ipAddress": str(device.ip_address),
                     "nowServerTimeMs": now_ms,
-                    "lastMessageAtMs": last_ms,
+                    "lastMessageAtMs": ref_ms,
+                    "lastSeenAtMs": last_seen_ms,
+                    "lastHl7RxAtMs": hl7_rx_ms,
                     "secondsSinceLastMessage": round(seconds_since, 2)
                     if seconds_since is not None
                     else None,
@@ -173,6 +206,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         "listenPort": hl7_port,
                         "threadAlive": thread_alive,
                         "localPortAcceptsConnections": port_accepts,
+                        "bindError": hl7_status.get("bindError"),
                     },
                     "hl7Diagnostic": hl7_diag,
                     "firewallHints": [
@@ -252,10 +286,11 @@ def device_from_screen(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def infrastructure(request):
-    from monitoring.hl7_listener import get_hl7_diagnostic_summary
+    from monitoring.hl7_listener import get_hl7_diagnostic_summary, get_hl7_listener_status
 
     hl7_extra = {
         "hl7Diagnostic": get_hl7_diagnostic_summary(),
+        "hl7ListenerStatus": get_hl7_listener_status(),
         "firewallHints": [
             "VPS: bulut panelida kiruvchi TCP 6006 (HL7) ochiq bo‘lsin.",
             "sudo ufw allow 6006/tcp && sudo ufw reload",

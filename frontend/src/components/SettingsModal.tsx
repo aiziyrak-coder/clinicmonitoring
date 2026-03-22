@@ -625,6 +625,11 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                 ) : (
                                   <span className="text-amber-400">ochiq emas</span>
                                 )}
+                                {connectionCheck.hl7.bindError ? (
+                                  <span className="block text-red-400 mt-1 text-xs">
+                                    Bind xato: {String(connectionCheck.hl7.bindError)}
+                                  </span>
+                                ) : null}
                               </li>
                               <li className="text-zinc-500">
                                 Server HL7 stat: TCP faqat (

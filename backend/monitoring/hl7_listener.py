@@ -27,6 +27,7 @@ HL7_DIAG: dict[str, object] = {
     "tcpSessionsWithoutHl7Payload": 0,
     "lastTcpRawBytesHex": None,
     "lastTcpRawPeer": None,
+    "bindError": None,
 }
 
 
@@ -37,6 +38,7 @@ def get_hl7_diagnostic_summary() -> dict[str, object]:
 
 
 def _record_hl7_session(peer_ip: str, raws: list[bytes], ack_attempted: bool) -> None:
+    now = int(time.time() * 1000)
     with HL7_DIAG_LOCK:
         if not raws:
             HL7_DIAG["tcpSessionsWithoutHl7Payload"] = (
@@ -44,7 +46,6 @@ def _record_hl7_session(peer_ip: str, raws: list[bytes], ack_attempted: bool) ->
             )
             return
         total = sum(len(r) for r in raws)
-        now = int(time.time() * 1000)
         HL7_DIAG["lastPayloadAtMs"] = now
         HL7_DIAG["lastPayloadPeer"] = peer_ip
         HL7_DIAG["lastPayloadTotalBytes"] = total
@@ -52,6 +53,19 @@ def _record_hl7_session(peer_ip: str, raws: list[bytes], ack_attempted: bool) ->
         HL7_DIAG["tcpSessionsWithHl7Payload"] = (
             int(HL7_DIAG.get("tcpSessionsWithHl7Payload") or 0) + 1
         )
+
+    from django.db import close_old_connections
+
+    from monitoring.device_integration import resolve_hl7_device_by_peer_ip
+    from monitoring.models import MonitorDevice
+
+    close_old_connections()
+    try:
+        dev = resolve_hl7_device_by_peer_ip(peer_ip)
+        if dev:
+            MonitorDevice.objects.filter(pk=dev.pk).update(last_hl7_rx_at_ms=now)
+    finally:
+        close_old_connections()
 
 
 def _normalize_peer_ip(ip: str) -> str:
@@ -87,12 +101,11 @@ def _send_mllp_ack_for_incoming(conn: socket.socket, incoming_raw: bytes) -> Non
     """
     if os.environ.get("HL7_SEND_ACK", "true").lower() not in ("1", "true", "yes", "on"):
         return
-    try:
-        text = incoming_raw.decode("utf-8", errors="replace")
-    except Exception:
+    from monitoring.hl7_parser import decode_hl7_text_best, hl7_raw_contains_msh_segment
+
+    if not hl7_raw_contains_msh_segment(incoming_raw):
         return
-    if "MSH|" not in text:
-        return
+    text = decode_hl7_text_best(incoming_raw)
     msg_id = _extract_msh10_message_control_id(text) or "UNKNOWN"
     dt = time.strftime("%Y%m%d%H%M%S", time.gmtime())
     ack_body = (
@@ -329,10 +342,9 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             try:
                 _send_mllp_ack_for_incoming(conn, raw)
                 ack_any = True
-                try:
-                    text = raw.decode("utf-8", errors="replace")
-                except Exception:
-                    text = raw.decode("latin-1", errors="replace")
+                from monitoring.hl7_parser import decode_hl7_text_best
+
+                text = decode_hl7_text_best(raw)
                 _process_hl7_text(text, raw, peer_ip, peer_raw)
             finally:
                 close_old_connections()
@@ -407,28 +419,54 @@ def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> Non
 
 
 def _serve_loop(host: str, port: int) -> None:
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        srv.bind((host, port))
-    except OSError as exc:
-        logger.error("HL7 tinglovchini bog'lash mumkin emas %s:%s — %s", host, port, exc)
-        return
-    srv.listen(32)
-    logger.info("HL7 MLLP tinglayapti: %s:%s", host, port)
+    """Port band bo'lsa yoki accept xato bersa — qayta urinish (Daphne qayta ishga tushmaguncha HL7 tiklanadi)."""
     while True:
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            conn, addr = srv.accept()
-            _apply_connection_recv_timeout(conn)
-            t = threading.Thread(
-                target=_handle_connection,
-                args=(conn, addr),
-                daemon=True,
-                name=f"hl7-{addr[0]}",
+            srv.bind((host, port))
+        except OSError as exc:
+            logger.error(
+                "HL7 bind xatolik %s:%s — %s. 60 soniyadan keyin qayta urinish.",
+                host,
+                port,
+                exc,
             )
-            t.start()
-        except OSError:
-            break
+            with HL7_DIAG_LOCK:
+                HL7_DIAG["bindError"] = str(exc)
+            try:
+                srv.close()
+            except OSError:
+                pass
+            time.sleep(60)
+            continue
+
+        with HL7_DIAG_LOCK:
+            HL7_DIAG["bindError"] = None
+
+        srv.listen(32)
+        logger.info("HL7 MLLP tinglayapti: %s:%s", host, port)
+        try:
+            while True:
+                try:
+                    conn, addr = srv.accept()
+                    _apply_connection_recv_timeout(conn)
+                    t = threading.Thread(
+                        target=_handle_connection,
+                        args=(conn, addr),
+                        daemon=True,
+                        name=f"hl7-{addr[0]}",
+                    )
+                    t.start()
+                except OSError:
+                    break
+        finally:
+            try:
+                srv.close()
+            except OSError:
+                pass
+        logger.warning("HL7: accept tsikli tugadi — 5s keyin qayta bog'lanish")
+        time.sleep(5)
 
 
 def is_hl7_listener_alive() -> bool:
@@ -466,6 +504,21 @@ def probe_hl7_tcp_listening() -> bool:
         return result == 0
     except OSError:
         return False
+
+
+def get_hl7_listener_status() -> dict[str, object]:
+    """API / audit: tinglovchi jarayoni, port, bind xatolik."""
+    host, port, en = get_hl7_listen_config()
+    with HL7_DIAG_LOCK:
+        bind_err = HL7_DIAG.get("bindError")
+    return {
+        "enabled": en,
+        "listenHost": host,
+        "listenPort": port,
+        "threadAlive": is_hl7_listener_alive(),
+        "localPortAcceptsConnections": probe_hl7_tcp_listening() if en else False,
+        "bindError": bind_err,
+    }
 
 
 def start_hl7_listener_thread() -> None:

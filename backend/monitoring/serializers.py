@@ -198,8 +198,9 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "bedId",
             "status",
             "last_seen",
+            "last_hl7_rx_at_ms",
         ]
-        read_only_fields = ["id", "status", "last_seen"]
+        read_only_fields = ["id", "status", "last_seen", "last_hl7_rx_at_ms"]
 
     def _normalize_optional_ip(self, attrs: dict[str, Any], key: str, api_key: str) -> None:
         if key not in attrs:
@@ -270,6 +271,7 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "bedId": instance.bed_id,
             "status": instance.status,
             "lastSeen": instance.last_seen,
+            "lastHl7RxAtMs": instance.last_hl7_rx_at_ms,
         }
 
 

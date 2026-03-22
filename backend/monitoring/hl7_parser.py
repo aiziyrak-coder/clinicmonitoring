@@ -452,6 +452,38 @@ def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
     return out
 
 
+def hl7_raw_contains_msh_segment(raw: bytes) -> bool:
+    """HL7 MSH — UTF-8 yoki UTF-16 (ACK / tekshiruv uchun)."""
+    if b"MSH|" in raw:
+        return True
+    if b"M\x00S\x00H\x00|\x00" in raw:
+        return True
+    if b"\x00\x4d\x00\x53\x00\x48\x00\x7c" in raw:
+        return True
+    return False
+
+
+def decode_hl7_text_best(raw: bytes) -> str:
+    """
+    Log va ACK uchun matn — MSH bor kodlashni ustuvor tanlaydi.
+    """
+    buf = raw.lstrip(b"\xef\xbb\xbf")
+    if buf.startswith(b"\xff\xfe"):
+        buf = buf[2:]
+    elif buf.startswith(b"\xfe\xff"):
+        buf = buf[2:]
+    for enc in ("utf-8", "utf-16-le", "utf-16-be", "cp1251", "latin-1"):
+        try:
+            if enc in ("utf-16-le", "utf-16-be") and len(buf) % 2 == 1:
+                continue
+            t = buf.decode(enc, errors="replace")
+            if "MSH|" in t:
+                return t
+        except (LookupError, UnicodeError):
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     """
     UTF-8, CP1251 va latin-1 bilan sinab, eng ko'p maydonni to'ldirgan natijani tanlaydi,

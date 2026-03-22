@@ -117,6 +117,11 @@ class MonitorDevice(models.Model):
     bed = models.ForeignKey(Bed, null=True, blank=True, on_delete=models.SET_NULL, related_name="devices")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.OFFLINE)
     last_seen = models.BigIntegerField(null=True, blank=True, help_text="Unix ms")
+    last_hl7_rx_at_ms = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="HL7 paket (MSH+) qabul qilingan vaqt (Unix ms). Faqat haqiqiy HL7 ma'lumot.",
+    )
 
     class Meta:
         ordering = ["model"]
