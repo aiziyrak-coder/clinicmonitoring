@@ -16,6 +16,7 @@ HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
   python deploy/deploy_remote.py hl7-debug-off
   python deploy/deploy_remote.py hl7-handshake-off   # hl7_real: MLLP salom o'ch (RST bo'lsa)
   python deploy/deploy_remote.py daphne-restart-logs # restart + HL7 journal (tez diagnostika)
+  python deploy/deploy_remote.py k12-setup           # faqat K12 qurilma + bemor + Daphne restart
 
 Muhit:
   SSH_PASSWORD yoki argv[1] — parol
@@ -54,6 +55,7 @@ SCRIPTS = {
     "hl7-debug-off": "remote_hl7_debug_off.sh",
     "hl7-handshake-off": "remote_hl7_handshake_device_off.sh",
     "daphne-restart-logs": "remote_daphne_restart_logs.sh",
+    "k12-setup": "remote_k12_setup_monitor.sh",
 }
 
 

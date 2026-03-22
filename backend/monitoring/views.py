@@ -110,6 +110,18 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             be = hl7_status.get("bindError")
             if hl7_enabled and be:
                 warnings.append(f"HL7 port bog'lanmadi (bind): {be}")
+            # Joy/bemor — vitallar yozilishi uchun; avvalo UI da tuzatish oson
+            if not bed_assigned:
+                warnings.append(
+                    "Qurilma joy (bed) ga biriktirilmagan — vitallar bemorga yozilmaydi."
+                )
+            elif not patient_on_bed:
+                bid = device.bed_id or "—"
+                warnings.append(
+                    f"Tanlangan joyda bemor yo'q (karavat {bid}). "
+                    "Sozlamalar → Bemorlar: bemorni qabul qilib shu karavarga biriktiring. "
+                    "Yoki serverda: python manage.py setup_real_hl7_monitor (demo bemorni qayta yaratadi)."
+                )
             if hl7_enabled:
                 if hl7_rx_ms is None:
                     warnings.append(
@@ -136,12 +148,6 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     warnings.append(
                         f"Oxirgi ma'lumot {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
                     )
-            if not bed_assigned:
-                warnings.append(
-                    "Qurilma joy (bed) ga biriktirilmagan — vitallar bemorga yozilmaydi."
-                )
-            elif not patient_on_bed:
-                warnings.append("Tanlangan joyda bemor yo'q — bemorni qabul qiling.")
 
             hl7_diag = get_hl7_diagnostic_summary()
             tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
@@ -153,10 +159,20 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 except (TypeError, ValueError):
                     empty_n = -1
                 if empty_n == 0:
-                    warnings.append(
-                        "Oxirgi HL7 bo'sh sessiya: TCP qabul=0 bayt — qurilma yubormagan yoki ulanishni darhol yopgan. "
-                        "«HL7 salom» ni O'chirish bilan sinab ko'ring; ORU/markaziy stansiya chiqishini menyuda tekshiring."
-                    )
+                    hs = device.hl7_connect_handshake
+                    if hs is True:
+                        warnings.append(
+                            "Oxirgi HL7 bo'sh sessiya: TCP qabul=0 bayt — «HL7 salom» (MLLP) yoqilgan; "
+                            "RST bo'lsa Sozlamalar → qurilmada salomni o'chiring yoki "
+                            "python manage.py setup_real_hl7_monitor (salom o'chiq). "
+                            "Shuningdek ORU/chiqish va datchiklar."
+                        )
+                    else:
+                        warnings.append(
+                            "Oxirgi HL7 bo'sh sessiya: TCP 0 bayt — serverda MLLP salom o'chiq; "
+                            "qurilma HL7 yubormayapti yoki ulanishni yopmoqda. "
+                            "K12: ORU/numerics/chiqish, ekranda vitallar (datchiklar) bor-yo'qligi; firewall 6006."
+                        )
                 elif empty_n > 0:
                     warnings.append(
                         f"Oxirgi sessiya: TCP {empty_n} bayt keldi, lekin MSH/HL7 ajratilmadi — "
