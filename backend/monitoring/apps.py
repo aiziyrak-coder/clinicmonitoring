@@ -38,5 +38,8 @@ class MonitoringConfig(AppConfig):
                 start_simulation_thread()
             start_hl7_listener_thread()
         except Exception:
-            # Migratsiya / DB tayyor bo‘lmaganda
-            pass
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Monitoring ilova ishga tushirishda xatolik (HL7 tinglovchi / simulyatsiya)"
+            )

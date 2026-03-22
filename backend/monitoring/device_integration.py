@@ -4,16 +4,59 @@ Qurilma vitallari — REST va HL7 dan kelgan ma'lumotlarni bemorga qo'llash va W
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Q
 
 from monitoring.broadcast import broadcast_event
 
 logger = logging.getLogger(__name__)
 from monitoring.models import MonitorDevice, Patient, VitalHistoryEntry
 from monitoring.simulation import calculate_news2
+
+
+def resolve_hl7_device_by_peer_ip(peer_ip: str) -> MonitorDevice | None:
+    """
+    TCP manbai IP bo'yicha MonitorDevice topish.
+    VPS + uy router NAT holatida server 192.168.x.x emas, tashqi IP ni ko'radi —
+    shuning uchun ip_address/local_ip bilan mos kelmasligi mumkin.
+    Yagona `hl7_enabled=True` qurilma bo'lsa (kichik klinika), peer_ip ni avto `hl7_peer_ip` ga yozadi.
+    """
+    dev = (
+        MonitorDevice.objects.filter(hl7_enabled=True)
+        .filter(
+            Q(ip_address=peer_ip)
+            | Q(local_ip=peer_ip)
+            | Q(hl7_peer_ip=peer_ip)
+        )
+        .first()
+    )
+    if dev:
+        return dev
+
+    en = os.environ.get("HL7_NAT_SINGLE_DEVICE_FALLBACK", "true").lower()
+    if en not in ("1", "true", "yes", "on"):
+        return None
+
+    qs = MonitorDevice.objects.filter(hl7_enabled=True)
+    if qs.count() != 1:
+        return None
+
+    only = qs.first()
+    assert only is not None
+    logger.info(
+        "HL7: NAT — peer=%s bitta yoqilgan qurilma %s bilan biriktirildi (local_ip=%s)",
+        peer_ip,
+        only.id,
+        only.local_ip or only.ip_address,
+    )
+    if only.hl7_peer_ip != peer_ip:
+        only.hl7_peer_ip = peer_ip
+        only.save(update_fields=["hl7_peer_ip"])
+    return only
 
 
 def _row_for_patient(p: Patient, history_override: list[dict[str, Any]] | None = None) -> dict[str, Any]:

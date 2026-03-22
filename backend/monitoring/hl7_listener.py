@@ -25,48 +25,73 @@ def _normalize_peer_ip(ip: str) -> str:
     return ip
 
 
-def _recv_hl7_payload(conn: socket.socket, max_bytes: int = 1_048_576) -> bytes | None:
+_MLLP_ENDS = (b"\x1c\x0d", b"\x1c\x0a")
+
+
+def _peel_one_mllp_payload(buf: bytes) -> tuple[bytes | None, bytes]:
     """
-    Avval MLLP ramkasi (0x0B … 0x1C 0x0D).
-    Bo'lmasa, bufferda MSH| bo'lsa — ulanish yopilguncha yig'ilgan ma'lumotdan HL7 ajratiladi
-    (ba'zi Creative Medical / boshqa firmwarelar).
+    Birinchi to'liq MLLP ramkasini ajratadi: 0x0B … 0x1C 0x0D yoki … 0x1C 0x0A.
+    To'liq bo'lmasa (None, buf) qaytariladi.
     """
-    buf = b""
+    start = buf.find(b"\x0b")
+    if start == -1:
+        return None, buf
+    sub = buf[start:]
+    end_rel: int | None = None
+    term_len = 2
+    for term in _MLLP_ENDS:
+        pos = sub.find(term)
+        if pos != -1:
+            end_rel = pos
+            term_len = len(term)
+            break
+    if end_rel is None:
+        return None, buf
+    abs_end = start + end_rel
+    payload = buf[start + 1 : abs_end]
+    remaining = buf[abs_end + term_len :]
+    return payload, remaining
+
+
+def _recv_all_hl7_payloads(conn: socket.socket, max_bytes: int = 1_048_576) -> list[bytes]:
+    """
+    Bir ulanishdan bitta yoki bir nechta HL7 xabarlarni olish.
+    Ba'zi qurilmalar avval ACK/heartbeat, keyin ORU^R01 yuboradi — bitta recv bilan faqat
+    birinchi ramka o'qilsa vitallar yo'qoladi.
+    MLLP bo'lmasa, yopilishda MSH| dan boshlab butun buffer bitta xabar sifatida olinadi.
+    """
+    buf = bytearray()
+    out: list[bytes] = []
     while len(buf) < max_bytes:
         chunk = conn.recv(8192)
         if not chunk:
             break
         buf += chunk
-        start = buf.find(b"\x0b")
-        if start != -1:
-            end = buf.find(b"\x1c\x0d", start)
-            if end != -1:
-                return buf[start + 1 : end]
+        while True:
+            msg, rest = _peel_one_mllp_payload(bytes(buf))
+            if msg is None:
+                buf[:] = rest
+                break
+            out.append(msg)
+            buf[:] = bytearray(rest)
 
-    if not buf:
-        return None
-    msh = buf.find(b"MSH|")
-    if msh == -1:
-        return None
-    return buf[msh:]
+    tail = bytes(buf)
+    if not tail:
+        return out
+    msh = tail.find(b"MSH|")
+    if msh != -1:
+        # MLLP boshlanmagan (yoki yopuvchi 0x1C0x0D yetib kelmagan) qoldiq
+        lone = tail[msh:]
+        if lone:
+            out.append(lone)
+    return out
 
 
 def _touch_device_online_on_connect(peer_ip: str) -> None:
     """TCP accept bo'lganda — HL7 tan o'qilishidan oldin qurilmani onlayn qilish."""
-    from django.db.models import Q
+    from monitoring.device_integration import mark_device_online_only, resolve_hl7_device_by_peer_ip
 
-    from monitoring.device_integration import mark_device_online_only
-    from monitoring.models import MonitorDevice
-
-    device = (
-        MonitorDevice.objects.filter(
-            Q(ip_address=peer_ip)
-            | Q(local_ip=peer_ip)
-            | Q(hl7_peer_ip=peer_ip)
-        )
-        .filter(hl7_enabled=True)
-        .first()
-    )
+    device = resolve_hl7_device_by_peer_ip(peer_ip)
     if device:
         mark_device_online_only(device)
         logger.info("HL7: TCP ulanish qabul qilindi — onlayn: %s peer=%s", device.id, peer_ip)
@@ -84,25 +109,26 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         finally:
             close_old_connections()
 
-        raw = _recv_hl7_payload(conn)
-        if not raw:
+        raws = _recv_all_hl7_payloads(conn)
+        if not raws:
             logger.warning(
                 "HL7: %s dan ma'lumot o'qilmadi (MLLP/MSH yo'q yoki bo'sh ulanish).",
                 peer_ip,
             )
             return
-        try:
-            text = raw.decode("utf-8", errors="replace")
-        except Exception:
-            text = raw.decode("latin-1", errors="replace")
 
         from django.db import close_old_connections
 
-        close_old_connections()
-        try:
-            _process_hl7_text(text, raw, peer_ip, peer_raw)
-        finally:
+        for raw in raws:
             close_old_connections()
+            try:
+                try:
+                    text = raw.decode("utf-8", errors="replace")
+                except Exception:
+                    text = raw.decode("latin-1", errors="replace")
+                _process_hl7_text(text, raw, peer_ip, peer_raw)
+            finally:
+                close_old_connections()
     except Exception:
         logger.exception("HL7 ulanish xatolik peer=%s", peer_ip)
     finally:
@@ -113,26 +139,19 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
 
 def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> None:
-    from django.db.models import Q
-
-    from monitoring.device_integration import apply_vitals_payload, mark_device_online_only
-    from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals_best
-    from monitoring.models import MonitorDevice
-
-    device = (
-        MonitorDevice.objects.filter(
-            Q(ip_address=peer_ip)
-            | Q(local_ip=peer_ip)
-            | Q(hl7_peer_ip=peer_ip)
-        )
-        .filter(hl7_enabled=True)
-        .first()
+    from monitoring.device_integration import (
+        apply_vitals_payload,
+        mark_device_online_only,
+        resolve_hl7_device_by_peer_ip,
     )
+    from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals_best
+
+    device = resolve_hl7_device_by_peer_ip(peer_ip)
     if not device:
         logger.warning(
             "HL7: manzil mos kelmedi — ulanish manbasi: %s (xom: %s). "
-            "MediCentralda qurilma 'ipAddress' yoki 'localIp' shu manzilga teng bo'lishi kerak; "
-            "NAT yoki boshqa IP bo'lsa, sozlamada yangilang.",
+            "Admin: MonitorDevice da ip_address/local_ip yoki hl7_peer_ip (NAT tashqi IP) ni tekshiring; "
+            "yoki bitta HL7 qurilma uchun HL7_NAT_SINGLE_DEVICE_FALLBACK=true (standart).",
             peer_ip,
             peer_raw,
         )

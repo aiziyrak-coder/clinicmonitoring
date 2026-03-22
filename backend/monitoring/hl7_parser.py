@@ -67,8 +67,8 @@ def _classify_obx3(field: str) -> str | None:
 
 
 def _extract_obx_value(parts: list[str]) -> str:
-    """OBX qiymati ba'zan 5-7 maydonlardan birida (ishlab chiqaruvchiga qarab)."""
-    for i in range(5, min(len(parts), 12)):
+    """OBX qiymati ba'zan 5–20+ maydonlardan birida (ishlab chiqaruvchiga qarab)."""
+    for i in range(5, min(len(parts), 25)):
         raw = parts[i].strip() if i < len(parts) else ""
         if not raw:
             continue
@@ -364,11 +364,21 @@ def parse_hl7_vitals(hl7_text: str) -> dict[str, Any]:
 
 def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     """
-    UTF-8 va keyin CP1251 (Rus firmware) bilan sinab, eng to'liq vitallarni qaytaradi.
+    UTF-8, CP1251 va latin-1 bilan sinab, eng ko'p maydonni to'ldirgan natijani tanlaydi,
+    qolgan kodlashlardan yetishmayotgan kalitlarni qo'shadi (bir xil xabarda aralash kodlash).
     """
-    t_utf = raw.decode("utf-8", errors="replace")
-    v = parse_hl7_vitals(t_utf)
-    if v:
-        return v
-    t_cp = raw.decode("cp1251", errors="replace")
-    return parse_hl7_vitals(t_cp)
+    candidates: list[tuple[int, dict[str, Any]]] = []
+    for enc in ("utf-8", "cp1251", "latin-1"):
+        t = raw.decode(enc, errors="replace")
+        v = parse_hl7_vitals(t)
+        if v:
+            candidates.append((len(v), v))
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: -x[0])
+    merged = dict(candidates[0][1])
+    for _, v in candidates[1:]:
+        for k, val in v.items():
+            if k not in merged:
+                merged[k] = val
+    return merged
