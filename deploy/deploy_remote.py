@@ -14,6 +14,7 @@ Keyingi yangilanishlar (git pull, migrate, frontend, nginx TLS, Daphne):
 HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
   python deploy/deploy_remote.py hl7-debug
   python deploy/deploy_remote.py hl7-debug-off
+  python deploy/deploy_remote.py hl7-handshake-off   # hl7_real: MLLP salom o'ch (RST bo'lsa)
 
 Muhit:
   SSH_PASSWORD yoki argv[1] — parol
@@ -46,6 +47,7 @@ SCRIPTS = {
     "update": "remote_full_update.sh",
     "hl7-debug": "remote_hl7_debug.sh",
     "hl7-debug-off": "remote_hl7_debug_off.sh",
+    "hl7-handshake-off": "remote_hl7_handshake_device_off.sh",
 }
 
 
