@@ -98,7 +98,9 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 else False
             )
 
+            # warnings — faqat tuzatish talab qilinadigan holatlar; qolganlari hints
             warnings: list[str] = []
+            hints: list[str] = []
             if hl7_enabled and not thread_alive:
                 warnings.append(
                     "HL7 fon jarayoni ishlamayapti — backend (Daphne) ni qayta ishga tushiring."
@@ -110,7 +112,6 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             be = hl7_status.get("bindError")
             if hl7_enabled and be:
                 warnings.append(f"HL7 port bog'lanmadi (bind): {be}")
-            # Joy/bemor — vitallar yozilishi uchun; avvalo UI da tuzatish oson
             if not bed_assigned:
                 warnings.append(
                     "Qurilma joy (bed) ga biriktirilmagan — vitallar bemorga yozilmaydi."
@@ -120,17 +121,17 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 warnings.append(
                     f"Tanlangan joyda bemor yo'q (karavat {bid}). "
                     "Sozlamalar → Bemorlar: bemorni qabul qilib shu karavarga biriktiring. "
-                    "Yoki serverda: python manage.py setup_real_hl7_monitor (demo bemorni qayta yaratadi)."
+                    "Yoki: python manage.py reset_monitoring_fresh yoki setup_real_hl7_monitor."
                 )
             if hl7_enabled:
                 if hl7_rx_ms is None:
-                    warnings.append(
-                        "HL7: serverda bu qurilma uchun hali HL7 paket (MSH) qabul qilinmagan — "
-                        "«onlayn» ko'rinishi TCP ulanishidan bo'lishi mumkin, vitallar emas."
+                    hints.append(
+                        "HL7: hali MSH paket kelmagan — «onlayn» ba'zan faqat TCP; vitallar HL7 kelgach."
                     )
-                    warnings.append(
-                        "Qurilma menyusida ORU/numerics/markaziy stansiya chiqishini tekshiring; "
-                        "manzil VPS tashqi IP:" + str(hl7_port) + " (HTTPS emas)."
+                    hints.append(
+                        "Monitor: ORU / numerics / markaziy stansiya chiqishi; manzil VPS IP:"
+                        + str(hl7_port)
+                        + " (TCP, HTTPS emas)."
                     )
                 elif not is_receiving:
                     warnings.append(
@@ -138,12 +139,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     )
             else:
                 if last_seen_ms is None:
-                    warnings.append(
-                        "Bu qurilma manzilidan hali ma'lumot kelmagan (REST vitals)."
-                    )
-                    warnings.append(
-                        "Monitor tarmoq manzili va REST yo'l uchun firewall ni tekshiring."
-                    )
+                    hints.append("REST vitals: hali ma'lumot kelmagan — tarmoq va firewall.")
                 elif not is_receiving:
                     warnings.append(
                         f"Oxirgi ma'lumot {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
@@ -161,26 +157,20 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 if empty_n == 0:
                     hs = device.hl7_connect_handshake
                     if hs is True:
-                        warnings.append(
-                            "Oxirgi HL7 bo'sh sessiya: TCP qabul=0 bayt — «HL7 salom» (MLLP) yoqilgan; "
-                            "RST bo'lsa Sozlamalar → qurilmada salomni o'chiring yoki "
-                            "python manage.py setup_real_hl7_monitor (salom o'chiq). "
-                            "Shuningdek ORU/chiqish va datchiklar."
+                        hints.append(
+                            "Oxirgi sessiya: TCP 0 bayt, MLLP salom yoqilgan — RST bo'lsa salomni o'chiring; ORU/datchiklar."
                         )
                     else:
-                        warnings.append(
-                            "Oxirgi HL7 bo'sh sessiya: TCP 0 bayt — serverda MLLP salom o'chiq; "
-                            "qurilma HL7 yubormayapti yoki ulanishni yopmoqda. "
-                            "K12: ORU/numerics/chiqish, ekranda vitallar (datchiklar) bor-yo'qligi; firewall 6006."
+                        hints.append(
+                            "Oxirgi sessiya: TCP 0 bayt (salom o'chiq) — K12 dan HL7 kutilmoqda: ORU, vitallar ekranda, firewall 6006."
                         )
                 elif empty_n > 0:
-                    warnings.append(
-                        f"Oxirgi sessiya: TCP {empty_n} bayt keldi, lekin MSH/HL7 ajratilmadi — "
-                        "boshqa freyming yoki kodlash. .env: HL7_DEBUG=true yoki HL7_LOG_FIRST_RECV_HEX=true, keyin journalctl."
+                    hints.append(
+                        f"Oxirgi sessiya: TCP {empty_n} bayt, MSH yo'q — kodlash/freyming. Kerak bo'lsa HL7_DEBUG / journalctl."
                     )
             if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
-                warnings.append(
-                    "HL7: bir nechta TCP sessiya HL7 paketsiz — VPS firewall 6006 va qurilma ORU chiqishini tekshiring."
+                hints.append(
+                    "Bir nechta TCP sessiya HL7siz — firewall 6006 va monitor chiqishini tekshiring."
                 )
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts and not be)
             pipeline_ok = bed_assigned and patient_on_bed
@@ -197,7 +187,10 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 summary_parts.append("HL7 o'chirilgan (faqat REST vitals).")
             if hl7_enabled:
                 if hl7_rx_ms is None:
-                    summary_parts.append("HL7 jismoniy paket hali kelmagan.")
+                    if bed_assigned and patient_on_bed and server_listen_ok:
+                        summary_parts.append("Server tayyor; HL7 paket monitor dan kutilmoqda.")
+                    else:
+                        summary_parts.append("HL7 jismoniy paket hali kelmagan.")
                 elif is_receiving:
                     summary_parts.append("HL7 ma'lumot oqimi yaxshi (chegara ichida).")
                 else:
@@ -248,6 +241,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         "patientOnBed": patient_on_bed,
                     },
                     "warnings": warnings,
+                    "hints": hints,
                     "summary": " ".join(summary_parts),
                 }
             )

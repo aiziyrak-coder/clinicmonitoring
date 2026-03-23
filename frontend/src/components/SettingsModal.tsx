@@ -104,6 +104,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
     allOk: boolean;
     summary: string;
     warnings: string[];
+    hints: string[];
     hl7: Record<string, unknown>;
     hl7Diagnostic: Record<string, unknown>;
     firewallHints: string[];
@@ -190,6 +191,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
         allOk: Boolean(data.allOk),
         summary: String(data.summary ?? ''),
         warnings: Array.isArray(data.warnings) ? (data.warnings as string[]) : [],
+        hints: Array.isArray(data.hints) ? (data.hints as string[]) : [],
         hl7: typeof data.hl7 === 'object' && data.hl7 !== null ? (data.hl7 as Record<string, unknown>) : {},
         hl7Diagnostic:
           typeof data.hl7Diagnostic === 'object' && data.hl7Diagnostic !== null
@@ -580,13 +582,20 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                         className={`rounded-xl border p-4 text-sm ${
                           connectionCheck.allOk
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                            : 'bg-amber-500/10 border-amber-500/30 text-amber-100'
+                            : connectionCheck.warnings.length > 0
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-100'
+                              : 'bg-sky-500/10 border-sky-500/25 text-sky-100'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="font-bold text-white mb-1">
-                              Ulanish tekshiruvi: {connectionCheck.allOk ? 'OK' : 'Diqqat'}
+                              Ulanish tekshiruvi:{' '}
+                              {connectionCheck.allOk
+                                ? 'OK'
+                                : connectionCheck.warnings.length > 0
+                                  ? 'Diqqat'
+                                  : 'Holat'}
                             </div>
                             <p className="text-zinc-300 mb-2">{connectionCheck.summary}</p>
                             <ul className="list-disc list-inside space-y-1 text-zinc-400">
@@ -675,6 +684,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                 <span className="font-semibold text-zinc-400">Firewall:</span>{' '}
                                 {connectionCheck.firewallHints.join(' ')}
                               </p>
+                            )}
+                            {connectionCheck.hints.length > 0 && (
+                              <ul className="mt-3 list-disc list-inside text-zinc-500 space-y-1 text-xs">
+                                {connectionCheck.hints.map((h, i) => (
+                                  <li key={`hint-${i}-${h.slice(0, 20)}`}>{h}</li>
+                                ))}
+                              </ul>
                             )}
                             {connectionCheck.warnings.length > 0 && (
                               <ul className="mt-3 list-disc list-inside text-amber-200/90 space-y-1">
