@@ -392,6 +392,27 @@ def _maybe_send_connect_handshake(conn: socket.socket, peer_ip: str) -> bool:
         return False
 
 
+def _send_oru_query_to_device(conn: socket.socket, peer_ip: str) -> bool:
+    """
+    K12 va ba'zi monitorlar faqat ORU so'roviga javob beradi.
+    Bu funksiya ORU^R01 so'rovini yuboradi.
+    """
+    dt = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+    # ORU so'rovi (query) - bu ba'zi monitorlarni javob berishga majburlaydi
+    body = (
+        f"MSH|^~\\&|MediCentral|MediCentral|Monitor|Monitor|{dt}||QRY^R01^QRY|QRY001|P|2.3\r"
+        f"QRD|{dt}|R|I|QRY001|||RD|001|OTH|||T|1\r"
+    )
+    payload = b"\x0b" + body.encode("utf-8") + b"\x1c\x0d"
+    try:
+        conn.sendall(payload)
+        logger.info("HL7: ORU so'rovi yuborildi peer=%s", peer_ip)
+        return True
+    except OSError as exc:
+        logger.info("HL7: ORU so'rovi yuborilmadi: %s", exc)
+        return False
+
+
 def _touch_device_online_on_connect(peer_ip: str) -> None:
     """TCP accept bo'lganda — HL7 tan o'qilishidan oldin qurilmani onlayn qilish."""
     from monitoring.device_integration import mark_device_online_only, resolve_hl7_device_by_peer_ip
@@ -427,30 +448,56 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
 
         _configure_accepted_socket(conn)
         
-        # K12 uchun: salomdan oldin ma'lumot kelishini kutish
+        # K12 uchun maxsus algoritm
+        logger.info("HL7: K12/maxsus qurilma algoritmi ishga tushmoqda...")
+        
+        # 1. Salomdan oldin ma'lumot kelishini kutish (qurilma birinchi yuboradigan bo'lsa)
         logger.info("HL7: Salomdan oldin ma'lumot kutilmoqda (300ms)...")
         pre_handshake_data = _recv_device_first_chunk_before_handshake(conn, peer_ip)
         
         if pre_handshake_data:
-            logger.info(
-                "HL7: Qurilma salomdan OLDIN ma'lumot yubordi! len=%s",
-                len(pre_handshake_data)
-            )
+            logger.info("HL7: Qurilma salomdan OLDIN ma'lumot yubordi! len=%s", len(pre_handshake_data))
         else:
-            logger.info("HL7: Qurilma salomdan oldin ma'lumot yubormadi, handshake yuborilmoqda...")
+            # 2. Qurilma ma'lumot yubormagan - so'rov yuboramiz
+            logger.info("HL7: Qurilma javob bermadi, so'rovlar yuborilmoqda...")
+            
+            # 2a. Handshake (agar sozlangan bo'lsa)
             handshake_sent = _maybe_send_connect_handshake(conn, peer_ip)
             if handshake_sent:
                 logger.info("HL7: MLLP handshake yuborildi")
-            else:
-                logger.info("HL7: Handshake yuborilmadi (sozlamalar o'chiq)")
+                time.sleep(0.1)  # Handshake javobini kutish
+                
+                # Handshake javobini tekshirish
+                try:
+                    conn.settimeout(0.5)
+                    hs_response = conn.recv(1024)
+                    if hs_response:
+                        logger.info("HL7: Handshake javobi qabul qilindi: %s bytes", len(hs_response))
+                        pre_handshake_data = hs_response
+                except socket.timeout:
+                    logger.info("HL7: Handshake javobi kelmadi")
+                except Exception as e:
+                    logger.info("HL7: Handshake qabulda xato: %s", e)
             
-            post_delay_ms = _env_float_ms("HL7_POST_CONNECT_HANDSHAKE_DELAY_MS", 0.0)
-            if post_delay_ms > 0:
-                logger.info("HL7: Post-handshake kechikish: %sms", post_delay_ms)
-                time.sleep(post_delay_ms / 1000.0)
-
-        # MA'LUMOTLARNI QABUL QILISH
-        logger.info("HL7: Ma'lumotlar qabul qilinmoqda...")
+            # 2b. ORU so'rovi (K12 ni javob berishga majburlash)
+            if not pre_handshake_data:
+                logger.info("HL7: ORU so'rovi yuborilmoqda...")
+                _send_oru_query_to_device(conn, peer_ip)
+                time.sleep(0.2)  # ORU javobini kutish
+                
+                try:
+                    conn.settimeout(1.0)
+                    oru_response = conn.recv(4096)
+                    if oru_response:
+                        logger.info("HL7: ORU javobi qabul qilindi: %s bytes", len(oru_response))
+                        pre_handshake_data = oru_response
+                except socket.timeout:
+                    logger.info("HL7: ORU javobi kelmadi")
+                except Exception as e:
+                    logger.info("HL7: ORU qabulda xato: %s", e)
+        
+        # 3. Qolgan ma'lumotlarni qabul qilish
+        logger.info("HL7: Qolgan ma'lumotlar qabul qilinmoqda...")
         raws, total_tcp_in = _recv_all_hl7_payloads(
             conn, peer_ip, initial=pre_handshake_data
         )

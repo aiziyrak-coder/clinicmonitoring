@@ -123,6 +123,27 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     "Sozlamalar → Bemorlar: bemorni qabul qilib shu karavarga biriktiring. "
                     "Yoki: python manage.py reset_monitoring_fresh yoki setup_real_hl7_monitor."
                 )
+            
+            hl7_diag = get_hl7_diagnostic_summary()
+            tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
+            has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
+            last_empty_tcp = hl7_diag.get("lastEmptySessionTcpBytes")
+            
+            # K12 / 0 bayt muammosi uchun maxsus tekshiruv
+            is_k12_zero_byte = (
+                hl7_enabled and 
+                hl7_rx_ms is None and 
+                tcp_no_hl7 >= 1 and 
+                not has_hl7_bytes
+            )
+            
+            if is_k12_zero_byte:
+                warnings.append(
+                    "K12 ZERO BYTE MUAMMO: TCP ulanish bo'lyapti, lekin HL7 ma'lumot 0 bayt. "
+                    "Qurilmada: 1) Menu → ORU → Enable, 2) Sensorlar ulangan (ECG lead on), "
+                    "3) HL7/MLLP protocol to'g'ri."
+                )
+            
             if hl7_enabled:
                 if hl7_rx_ms is None:
                     hints.append(
@@ -133,6 +154,10 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         + str(hl7_port)
                         + " (TCP, HTTPS emas)."
                     )
+                    if is_k12_zero_byte:
+                        hints.append(
+                            "K12 maxsus: Admin panelda 'Qo'llab-quvvatlash' → 'ORU so'rovini yuborish' ni bosing."
+                        )
                 elif not is_receiving:
                     warnings.append(
                         f"Oxirgi HL7 paket {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
@@ -145,10 +170,6 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         f"Oxirgi ma'lumot {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
                     )
 
-            hl7_diag = get_hl7_diagnostic_summary()
-            tcp_no_hl7 = int(hl7_diag.get("tcpSessionsWithoutHl7Payload") or 0)
-            has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
-            last_empty_tcp = hl7_diag.get("lastEmptySessionTcpBytes")
             if hl7_enabled and hl7_rx_ms is None and last_empty_tcp is not None:
                 try:
                     empty_n = int(last_empty_tcp)
@@ -172,6 +193,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 hints.append(
                     "Bir nechta TCP sessiya HL7siz — firewall 6006 va monitor chiqishini tekshiring."
                 )
+            
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts and not be)
             pipeline_ok = bed_assigned and patient_on_bed
             if hl7_enabled:
@@ -188,7 +210,10 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             if hl7_enabled:
                 if hl7_rx_ms is None:
                     if bed_assigned and patient_on_bed and server_listen_ok:
-                        summary_parts.append("Server tayyor; HL7 paket monitor dan kutilmoqda.")
+                        if is_k12_zero_byte:
+                            summary_parts.append("K12 ZERO BYTE: Qurilma TCP ulanadi, lekin HL7 yubormaydi.")
+                        else:
+                            summary_parts.append("Server tayyor; HL7 paket monitor dan kutilmoqda.")
                     else:
                         summary_parts.append("HL7 jismoniy paket hali kelmagan.")
                 elif is_receiving:
@@ -222,6 +247,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     else None,
                     "isReceivingData": is_receiving,
                     "dataTimeoutSeconds": int(threshold_sec),
+                    "isK12ZeroByte": is_k12_zero_byte,
                     "hl7": {
                         "enabled": hl7_enabled,
                         "listenHost": hl7_host,
