@@ -1,0 +1,18 @@
+[Unit]
+Description=MediCentral HL7 Node TCP bridge (optional; HL7_TCP_PORT default 6007)
+After=network.target clinicmonitoring-daphne.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clinicmonitoring/tools/hl7-tcp-server
+Environment=HL7_TCP_PORT=6007
+Environment=HL7_HTTP_URL=http://127.0.0.1:8012/api/hl7/
+Environment=HL7_DEVICE_IP=192.168.0.228
+EnvironmentFile=-/opt/clinicmonitoring/backend/.env
+ExecStart=/usr/bin/node /opt/clinicmonitoring/tools/hl7-tcp-server/server.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

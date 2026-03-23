@@ -19,6 +19,7 @@ HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
   python deploy/deploy_remote.py k12-setup           # faqat K12 qurilma + bemor + Daphne restart
   python deploy/deploy_remote.py reset-fresh         # baza tozalash + K12 noldan + Daphne restart
   python deploy/deploy_remote.py hl7-post-setup      # HL7_BRIDGE_TOKEN + /api/hl7/ test (deploydan keyin)
+  python deploy/deploy_remote.py hl7-node-enable     # Node HL7 bridge systemd (6007 TCP)
 
 Muhit:
   SSH_PASSWORD yoki oxirgi argv — parol (ixtiyoriy, agar kalit bo'lsa)
@@ -62,6 +63,7 @@ SCRIPTS = {
     "k12-setup": "remote_k12_setup_monitor.sh",
     "reset-fresh": "remote_reset_monitoring_fresh.sh",
     "hl7-post-setup": "remote_hl7_post_setup.sh",
+    "hl7-node-enable": "remote_hl7_node_enable.sh",
 }
 
 
