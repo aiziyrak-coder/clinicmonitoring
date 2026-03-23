@@ -405,7 +405,17 @@ def _touch_device_online_on_connect(peer_ip: str) -> None:
 def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
     peer_raw = addr[0]
     peer_ip = _normalize_peer_ip(peer_raw)
-    logger.info("HL7: Yangi TCP ulanish qabul qilindi peer=%s (raw=%s)", peer_ip, peer_raw)
+    logger.info("=" * 60)
+    logger.info("HL7: YANGI TCP ulanish qabul qilindi peer=%s (raw=%s)", peer_ip, peer_raw)
+    
+    # Qurilma sozlamalarini tekshirish
+    from monitoring.device_integration import resolve_hl7_device_by_peer_ip
+    dev = resolve_hl7_device_by_peer_ip(peer_ip, allow_nat_loopback=True)
+    if dev:
+        logger.info("HL7: Qurilma topildi: %s, handshake=%s", dev.id, dev.hl7_connect_handshake)
+    else:
+        logger.warning("HL7: Qurilma topilmadi peer=%s", peer_ip)
+    
     try:
         from django.db import close_old_connections
 
@@ -416,49 +426,70 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             close_old_connections()
 
         _configure_accepted_socket(conn)
+        
+        # K12 uchun: salomdan oldin ma'lumot kelishini kutish
+        logger.info("HL7: Salomdan oldin ma'lumot kutilmoqda (300ms)...")
         pre_handshake_data = _recv_device_first_chunk_before_handshake(conn, peer_ip)
-        if not pre_handshake_data:
-            _maybe_send_connect_handshake(conn, peer_ip)
+        
+        if pre_handshake_data:
+            logger.info(
+                "HL7: Qurilma salomdan OLDIN ma'lumot yubordi! len=%s",
+                len(pre_handshake_data)
+            )
+        else:
+            logger.info("HL7: Qurilma salomdan oldin ma'lumot yubormadi, handshake yuborilmoqda...")
+            handshake_sent = _maybe_send_connect_handshake(conn, peer_ip)
+            if handshake_sent:
+                logger.info("HL7: MLLP handshake yuborildi")
+            else:
+                logger.info("HL7: Handshake yuborilmadi (sozlamalar o'chiq)")
+            
             post_delay_ms = _env_float_ms("HL7_POST_CONNECT_HANDSHAKE_DELAY_MS", 0.0)
             if post_delay_ms > 0:
+                logger.info("HL7: Post-handshake kechikish: %sms", post_delay_ms)
                 time.sleep(post_delay_ms / 1000.0)
-        else:
-            logger.info(
-                "HL7: ulanish MLLP salomi o'tkazildi — qurilma allaqachon ma'lumot yuborgan peer=%s",
-                peer_ip,
-            )
 
+        # MA'LUMOTLARNI QABUL QILISH
+        logger.info("HL7: Ma'lumotlar qabul qilinmoqda...")
         raws, total_tcp_in = _recv_all_hl7_payloads(
             conn, peer_ip, initial=pre_handshake_data
         )
         
-        logger.info("HL7: TCP sessiya yakunlandi peer=%s, jami_payload=%s, jami_bytes=%s", 
-                    peer_ip, len(raws), total_tcp_in)
+        logger.info("HL7: Sessiya yakunlandi. Payloads=%s, Jami bytes=%s", 
+                    len(raws), total_tcp_in)
+        
         if not raws:
             from monitoring.device_integration import is_loopback_peer_ip
 
             if is_loopback_peer_ip(peer_ip):
-                logger.debug(
-                    "HL7: loopback bo'sh sessiya (ehtimol port tekshiruvi) — diagnostika va NAT ga kiritilmadi peer=%s",
-                    peer_ip,
-                )
+                logger.debug("HL7: Loopback bo'sh sessiya")
                 return
+                
             _record_hl7_session(peer_ip, [], False)
             with HL7_DIAG_LOCK:
                 HL7_DIAG["lastEmptySessionTcpBytes"] = total_tcp_in
                 HL7_DIAG["lastEmptySessionPeer"] = peer_ip
+                
             if total_tcp_in == 0:
-                logger.warning(
-                    "HL7: %s — ulanish yopildi, TCP qabul=0 bayt. Qurilma yubormagan yoki darhol FIN/RST; "
-                    "handshake «O'chirish» ni sinab ko'ring; qurilma ORU menyusini tekshiring.",
+                logger.error(
+                    "=" * 60 + "\n"
+                    "HL7 MUAMMO: %s — TCP ulanish bo'ldi, lekin 0 bayt!\n"
+                    "Sabablar:\n"
+                    "1. Qurilma HL7/MLLP yo'q (faqat TCP)\n"
+                    "2. Handshake muammosi (hl7_connect_handshake ni o'zgartiring)\n"
+                    "3. Qurilma ORU yuborishni kutmoqda (sensorlar tekshirilsin)\n"
+                    "4. Firewall/router TCP reset yuborayapti\n"
+                    "Yechim:\n"
+                    "- Admin panelda device.hl7_connect_handshake: True/False\n"
+                    "- .env: HL7_RECV_BEFORE_HANDSHAKE_MS=500\n"
+                    "- Monitor menyusida HL7/central station yoqilganini tekshiring\n"
+                    "=" * 60,
                     peer_ip,
                 )
             else:
                 logger.warning(
-                    "HL7: %s — HL7/MSH ajratilmadi, lekin TCP qabul=%s bayt (format/kodlash boshqacha bo'lishi mumkin). "
-                    ".env: HL7_LOG_RAW_TCP_RECV=true yoki HL7_LOG_FIRST_RECV_HEX=true.",
-                    peer_ip,
-                    total_tcp_in,
+                    "HL7: %s — HL7/MSH ajratilmadi, lekin TCP qabul=%s bayt",
+                    peer_ip, total_tcp_in,
                 )
             return
 

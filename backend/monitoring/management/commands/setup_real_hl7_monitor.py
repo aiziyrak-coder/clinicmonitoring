@@ -149,6 +149,41 @@ class Command(BaseCommand):
             device.save(update_fields=["hl7_peer_ip"])
         device.hl7_connect_handshake = bool(options["hl7_handshake"])
         device.save(update_fields=["hl7_connect_handshake"])
+        
+        # K12 uchun tavsiyalar
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.NOTICE("K12 MONITOR SOZLAMALARI:"))
+        self.stdout.write("=" * 60)
+        self.stdout.write("""
+Qurilmada (K12) quyidagilarni tekshiring:
+
+1. Ekran: Menu → Internet → HL7
+   - Server IP: {server_ip}
+   - Port: 6006
+   - Protocol: HL7 (yoki MLLP)
+   - Status: Connected (yashil)
+
+2. Ekran: Menu → ORU (yoki Central Station)
+   - ORU yuborish: YOQILGAN
+   - Interval: 5-10 soniya
+   - Agar "ORU" yo'q bo'lsa: Numerics → Central Station
+
+3. Sensorlar holati:
+   - ECG elektrodlar ulangan (lead on)
+   - SpO2 barmoq sensori ishlayapti
+   - NIBP mansjet ulangan
+
+4. Agar TCP 0 bayt bo'lsa:
+   - Admin panelda handshake: {handshake}
+   - .env: HL7_RECV_BEFORE_HANDSHAKE_MS=500
+   - .env: HL7_SEND_CONNECT_HANDSHAKE=true (yoki false)
+
+5. Loglarni kuzatish:
+   journalctl -u clinicmonitoring-daphne -f
+        """.format(
+            server_ip=options['server_ip'],
+            handshake=device.hl7_connect_handshake
+        ))
 
         now_ms = int(time.time() * 1000)
         patient_id = options["patient_id"]
