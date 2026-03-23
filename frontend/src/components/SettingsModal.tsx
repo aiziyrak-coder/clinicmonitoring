@@ -563,14 +563,15 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                     <div className="rounded-lg border border-zinc-700/50 bg-zinc-900/40 p-3 text-xs text-zinc-400">
                       <p className="font-medium text-zinc-300 mb-1">K12 (Creative Medical) — qurilma sozlash</p>
                       <p className="leading-relaxed">
-                        Rus menyuda: pastki <span className="text-zinc-300">«Меню»</span> → jadvaldan{' '}
-                        <span className="text-zinc-300">«Параметры системы»</span> (tizim parametrlari) → yuqori
-                        varaq <span className="text-zinc-300">«Интернет»</span> →{' '}
-                        <span className="text-zinc-300">HL7</span>: server VPS tashqi IP, port{' '}
-                        <span className="text-zinc-300">6006</span>. ORU / numerics chiqishi: ishlab chiqaruvchi
-                        bo‘yicha <span className="text-zinc-300">«Просмотры»</span> yoki monitoring ostidagi ORU
-                        bandi. <span className="text-zinc-300">AI-ECG</span> alohida xizmat — MediCentral HL7 bilan
-                        bog‘liq emas.
+                        Asosiy: <span className="text-zinc-300">«Меню»</span> →{' '}
+                        <span className="text-zinc-300">«Параметры системы»</span> → varaq{' '}
+                        <span className="text-zinc-300">«Интернет»</span> → <span className="text-zinc-300">HL7</span>{' '}
+                        (VPS IP, port <span className="text-zinc-300">6006</span>). «ORU» alohida punkt bo‘lmasligi
+                        mumkin — ko‘p K12 larda HL7 ulanishi yoqilgach vitallar avtomatik yuboriladi (HL7 standartida
+                        bu ORU^R01). Tekshiruv: HL7 ekranida ulanish yashil / «Тест» muvaffaqiyati; asosiy ekranda HR,
+                        SpO2 raqamlari «—» emas. Qidiriladigan boshqa nomlar: «передача», «обмен», «сетевой поток»,
+                        «наблюдения». <span className="text-zinc-300">AI-ECG</span> — alohida port; MediCentral uchun
+                        shart emas.
                       </p>
                     </div>
 

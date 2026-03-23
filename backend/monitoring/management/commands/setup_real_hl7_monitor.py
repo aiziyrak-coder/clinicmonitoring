@@ -69,9 +69,14 @@ class Command(BaseCommand):
             help="Qurilmada 'Server IP' maydoni (ma'lumot)",
         )
         parser.add_argument(
+            "--hl7-handshake",
+            action="store_true",
+            help="MLLP salomni yoqish (ba'zi K12). Standart: o'chiq.",
+        )
+        parser.add_argument(
             "--no-hl7-handshake",
             action="store_true",
-            help="MLLP salomni o'chirish (RST+0 bayt bo'lsa sinav). Standart: yoqilgan (K12 tavsiyasi).",
+            help="MLLP salomni majburan o'chirish (standart bilan bir xil; eski skriptlar uchun).",
         )
 
     @transaction.atomic
@@ -147,7 +152,10 @@ class Command(BaseCommand):
         if device.hl7_peer_ip in ("127.0.0.1", "::1"):
             device.hl7_peer_ip = None
             device.save(update_fields=["hl7_peer_ip"])
-        device.hl7_connect_handshake = not bool(options["no_hl7_handshake"])
+        hs = bool(options["hl7_handshake"])
+        if options["no_hl7_handshake"]:
+            hs = False
+        device.hl7_connect_handshake = hs
         device.save(update_fields=["hl7_connect_handshake"])
         
         # K12 uchun tavsiyalar

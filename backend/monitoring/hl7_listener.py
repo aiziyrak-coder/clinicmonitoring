@@ -519,7 +519,8 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
                 
             if total_tcp_in == 0:
                 logger.error(
-                    "=" * 60 + "\n"
+                    "=" * 60
+                    + "\n"
                     "HL7 MUAMMO: %s — TCP ulanish bo'ldi, lekin 0 bayt!\n"
                     "Sabablar:\n"
                     "1. Qurilma HL7/MLLP yo'q (faqat TCP)\n"
@@ -530,7 +531,7 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
                     "- Admin panelda device.hl7_connect_handshake: True/False\n"
                     "- .env: HL7_RECV_BEFORE_HANDSHAKE_MS=500\n"
                     "- Monitor menyusida HL7/central station yoqilganini tekshiring\n"
-                    "=" * 60,
+                    + ("=" * 60),
                     peer_ip,
                 )
             else:
