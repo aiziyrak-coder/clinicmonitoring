@@ -19,5 +19,6 @@ urlpatterns = [
     path("infrastructure/", views.infrastructure),
     path("patients/", views.patients_list),
     path("health/", views.health),
+    path("hl7/", views.hl7_bridge_ingest),
     path("device/<str:ip>/vitals/", views.device_vitals_ingest),
 ]

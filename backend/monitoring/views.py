@@ -5,10 +5,16 @@ import time
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connection
+from django.db import connection, transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
-from rest_framework.decorators import action, api_view, parser_classes, permission_classes
+from rest_framework.decorators import (
+    action,
+    api_view,
+    authentication_classes,
+    parser_classes,
+    permission_classes,
+)
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -427,6 +433,61 @@ def patients_list(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def hl7_bridge_ingest(request):
+    """
+    Tashqi HL7 TCP bridge (masalan Node.js) JSON vitallarni yuboradi.
+    Header: ``X-HL7-Bridge-Token`` yoki ``Authorization: Bearer <token>`` —
+    ``HL7_BRIDGE_TOKEN`` muhitda bo'lsa majburiy; bo'lmasa faqat ``DEBUG=true`` da ruxsat.
+    Body: ``deviceIp`` (majburiy), ``hr``, ``spo2``, ``nibpSys``, ``nibpDia``, ``rr``, ``temp``.
+    """
+    expected = os.environ.get("HL7_BRIDGE_TOKEN", "").strip()
+    if expected:
+        got = (request.headers.get("X-HL7-Bridge-Token") or "").strip()
+        if not got:
+            auth = request.headers.get("Authorization") or ""
+            if auth.lower().startswith("bearer "):
+                got = auth[7:].strip()
+        if got != expected:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+    else:
+        from django.conf import settings as dj_settings
+
+        if not dj_settings.DEBUG:
+            return Response(
+                {"error": "HL7_BRIDGE_TOKEN is not configured"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+    data = request.data if isinstance(request.data, dict) else {}
+    device_ip = (data.get("deviceIp") or data.get("device_ip") or "").strip()
+    if not device_ip:
+        return Response({"error": "deviceIp required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    vital_data = {k: data[k] for k in ("hr", "spo2", "nibpSys", "nibpDia", "rr", "temp") if k in data}
+    ser = DeviceVitalsIngestSerializer(data=vital_data)
+    ser.is_valid(raise_exception=True)
+    payload = {k: ser.validated_data[k] for k in ser.validated_data if ser.validated_data[k] is not None}
+    if not payload:
+        return Response(
+            {"error": "At least one vital field (hr, spo2, ...) required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from monitoring.device_integration import apply_vitals_payload
+
+    try:
+        device = MonitorDevice.objects.get(ip_address=device_ip)
+    except MonitorDevice.DoesNotExist:
+        return Response({"error": "Device not registered"}, status=status.HTTP_404_NOT_FOUND)
+
+    with transaction.atomic():
+        apply_vitals_payload(device, payload, mark_online=True)
+    return Response({"success": True, "message": "Data received"})
+
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def device_vitals_ingest(request, ip: str):
     from monitoring.device_integration import apply_vitals_payload
@@ -456,6 +517,7 @@ def root(request):
             "service": "ClinicMonitoring API",
             "version": "1",
             "health": "/api/health/",
+            "hl7Bridge": "/api/hl7/",
             "api": "/api/",
             "admin": "/admin/",
             "websocket": "/ws/monitoring/",

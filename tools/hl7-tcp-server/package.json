@@ -1,0 +1,14 @@
+{
+  "name": "hl7-tcp-server",
+  "version": "1.0.0",
+  "description": "HL7/MLLP TCP listener — parses vitals, POSTs JSON to MediCentral /api/hl7",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["hl7", "mllp", "tcp", "vitals"],
+  "license": "MIT"
+}
