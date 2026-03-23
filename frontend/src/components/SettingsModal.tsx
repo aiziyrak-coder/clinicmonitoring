@@ -560,6 +560,20 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                       </div>
                     </div>
 
+                    <div className="rounded-lg border border-zinc-700/50 bg-zinc-900/40 p-3 text-xs text-zinc-400">
+                      <p className="font-medium text-zinc-300 mb-1">K12 (Creative Medical) — qurilma sozlash</p>
+                      <p className="leading-relaxed">
+                        Rus menyuda: pastki <span className="text-zinc-300">«Меню»</span> → jadvaldan{' '}
+                        <span className="text-zinc-300">«Параметры системы»</span> (tizim parametrlari) → yuqori
+                        varaq <span className="text-zinc-300">«Интернет»</span> →{' '}
+                        <span className="text-zinc-300">HL7</span>: server VPS tashqi IP, port{' '}
+                        <span className="text-zinc-300">6006</span>. ORU / numerics chiqishi: ishlab chiqaruvchi
+                        bo‘yicha <span className="text-zinc-300">«Просмотры»</span> yoki monitoring ostidagi ORU
+                        bandi. <span className="text-zinc-300">AI-ECG</span> alohida xizmat — MediCentral HL7 bilan
+                        bog‘liq emas.
+                      </p>
+                    </div>
+
                     {data.geminiConfigured !== true && (
                       <div
                         role="status"

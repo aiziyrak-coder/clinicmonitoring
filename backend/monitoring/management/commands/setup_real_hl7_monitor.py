@@ -69,9 +69,9 @@ class Command(BaseCommand):
             help="Qurilmada 'Server IP' maydoni (ma'lumot)",
         )
         parser.add_argument(
-            "--hl7-handshake",
+            "--no-hl7-handshake",
             action="store_true",
-            help="Ulanishda MLLP salom yuborish (ba'zi firmware; ko'pincha o'chiq — RST+0 bayt bo'lsa)",
+            help="MLLP salomni o'chirish (RST+0 bayt bo'lsa sinav). Standart: yoqilgan (K12 tavsiyasi).",
         )
 
     @transaction.atomic
@@ -147,7 +147,7 @@ class Command(BaseCommand):
         if device.hl7_peer_ip in ("127.0.0.1", "::1"):
             device.hl7_peer_ip = None
             device.save(update_fields=["hl7_peer_ip"])
-        device.hl7_connect_handshake = bool(options["hl7_handshake"])
+        device.hl7_connect_handshake = not bool(options["no_hl7_handshake"])
         device.save(update_fields=["hl7_connect_handshake"])
         
         # K12 uchun tavsiyalar
@@ -174,9 +174,9 @@ Qurilmada (K12) quyidagilarni tekshiring:
    - NIBP mansjet ulangan
 
 4. Agar TCP 0 bayt bo'lsa:
-   - Admin panelda handshake: {handshake}
+   - Admin panelda «HL7 salom» ni **O'chirish** ga o'zgartirib sinang (RST bo'lsa)
    - .env: HL7_RECV_BEFORE_HANDSHAKE_MS=500
-   - .env: HL7_SEND_CONNECT_HANDSHAKE=true (yoki false)
+   - .env: HL7_SEND_CONNECT_HANDSHAKE (muhit bo‘yicha)
 
 5. Loglarni kuzatish:
    journalctl -u clinicmonitoring-daphne -f
