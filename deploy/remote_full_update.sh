@@ -33,6 +33,9 @@ fi
 if ! grep -q "^HL7_RECV_TIMEOUT_SEC=" .env 2>/dev/null; then
   echo "HL7_RECV_TIMEOUT_SEC=0" >> .env
 fi
+if ! grep -q "^HL7_RECV_BEFORE_HANDSHAKE_MS=" .env 2>/dev/null; then
+  echo "HL7_RECV_BEFORE_HANDSHAKE_MS=300" >> .env
+fi
 # Eski default handshake=true ba'zi monitorlarda serverdan oldin yuborilgan MLLP ulanishni buzadi — false
 if grep -q "^HL7_SEND_CONNECT_HANDSHAKE=true" .env 2>/dev/null; then
   cp -a .env .env.bak_handshake 2>/dev/null || cp .env .env.bak_handshake

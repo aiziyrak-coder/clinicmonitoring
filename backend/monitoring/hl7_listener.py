@@ -173,6 +173,67 @@ def _apply_connection_recv_timeout(conn: socket.socket) -> None:
         conn.settimeout(None)
 
 
+def _env_float_ms(key: str, default: float) -> float:
+    """Muhit: millisekund (masalan 300) yoki bo'sh = default."""
+    raw = os.environ.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _recv_device_first_chunk_before_handshake(conn: socket.socket, peer_ip: str) -> bytes:
+    """
+    Ba'zi monitorlar (jumladan K12) TCP ochilishi bilan darhol ORU yuboradi; serverdan
+    avval MLLP salom yuborilsa, ba'zi firmware ulanishni yopadi yoki 0 bayt qoldiradi.
+    Shu sababdan salomdan oldin qisqa kutish bilan birinchi paketni o'qimiz.
+    """
+    wait_ms = _env_float_ms("HL7_RECV_BEFORE_HANDSHAKE_MS", 300.0)
+    if wait_ms <= 0:
+        return b""
+    chunk = b""
+    try:
+        conn.settimeout(wait_ms / 1000.0)
+        chunk = conn.recv(65536)
+    except socket.timeout:
+        chunk = b""
+    except (ConnectionResetError, BrokenPipeError):
+        chunk = b""
+    except OSError as exc:
+        if exc.errno in (
+            errno.ECONNRESET,
+            errno.EPIPE,
+            errno.ETIMEDOUT,
+            10054,
+            10053,
+        ):
+            chunk = b""
+        else:
+            raise
+    finally:
+        _apply_connection_recv_timeout(conn)
+    if chunk:
+        from monitoring.hl7_env import want_log_first_recv_hex
+
+        if want_log_first_recv_hex():
+            prev = chunk[:160]
+            logger.info(
+                "HL7: salomdan oldin TCP peer=%s len=%s hex=%s",
+                peer_ip,
+                len(chunk),
+                prev.hex(),
+            )
+        else:
+            logger.info(
+                "HL7: salomdan oldin ma'lumot keldi peer=%s len=%s (salom o'tkaziladi)",
+                peer_ip,
+                len(chunk),
+            )
+    return chunk
+
+
 def _recv_hl7_chunk(conn: socket.socket) -> bytes:
     """recv(); peer RST/FIN — xatolik emas, qolgan buffer qayta ishlanadi."""
     try:
@@ -223,7 +284,11 @@ def _maybe_log_tcp_raw_diagnostic(peer_ip: str, tail: bytes) -> None:
 
 
 def _recv_all_hl7_payloads(
-    conn: socket.socket, peer_ip: str, max_bytes: int = 1_048_576
+    conn: socket.socket,
+    peer_ip: str,
+    max_bytes: int = 1_048_576,
+    *,
+    initial: bytes = b"",
 ) -> tuple[list[bytes], int]:
     """
     Bir ulanishdan bitta yoki bir nechta HL7 xabarlarni olish.
@@ -231,11 +296,12 @@ def _recv_all_hl7_payloads(
     birinchi ramka o'qilsa vitallar yo'qoladi.
     MLLP bo'lmasa, yopilishda MSH| dan boshlab butun buffer bitta xabar sifatida olinadi.
     Peer RST (Connection reset by peer) — recv xato emas; shu paytgacha kelgan baytlar saqlanadi.
+    `initial` — salomdan oldin olingan TCP qismi (qurilma birinchi yuborgan ma'lumot).
     """
-    buf = bytearray()
+    buf = bytearray(initial)
     out: list[bytes] = []
-    first_chunk_logged = False
-    total_recv_bytes = 0
+    first_chunk_logged = bool(initial)
+    total_recv_bytes = len(initial)
     while len(buf) < max_bytes:
         chunk = _recv_hl7_chunk(conn)
         if not chunk:
@@ -349,9 +415,21 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
             close_old_connections()
 
         _configure_accepted_socket(conn)
-        _maybe_send_connect_handshake(conn, peer_ip)
+        pre_handshake_data = _recv_device_first_chunk_before_handshake(conn, peer_ip)
+        if not pre_handshake_data:
+            _maybe_send_connect_handshake(conn, peer_ip)
+            post_delay_ms = _env_float_ms("HL7_POST_CONNECT_HANDSHAKE_DELAY_MS", 0.0)
+            if post_delay_ms > 0:
+                time.sleep(post_delay_ms / 1000.0)
+        else:
+            logger.info(
+                "HL7: ulanish MLLP salomi o'tkazildi — qurilma allaqachon ma'lumot yuborgan peer=%s",
+                peer_ip,
+            )
 
-        raws, total_tcp_in = _recv_all_hl7_payloads(conn, peer_ip)
+        raws, total_tcp_in = _recv_all_hl7_payloads(
+            conn, peer_ip, initial=pre_handshake_data
+        )
         if not raws:
             from monitoring.device_integration import is_loopback_peer_ip
 
