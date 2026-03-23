@@ -20,6 +20,7 @@ HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
   python deploy/deploy_remote.py reset-fresh         # baza tozalash + K12 noldan + Daphne restart
   python deploy/deploy_remote.py hl7-post-setup      # HL7_BRIDGE_TOKEN + /api/hl7/ test (deploydan keyin)
   python deploy/deploy_remote.py hl7-node-enable     # Node HL7 bridge systemd (6007 TCP)
+  python deploy/deploy_remote.py vitals-stack        # Express vitals API :3040 + gateway :6008 + nginx
 
 Muhit:
   SSH_PASSWORD yoki oxirgi argv — parol (ixtiyoriy, agar kalit bo'lsa)
@@ -64,6 +65,7 @@ SCRIPTS = {
     "reset-fresh": "remote_reset_monitoring_fresh.sh",
     "hl7-post-setup": "remote_hl7_post_setup.sh",
     "hl7-node-enable": "remote_hl7_node_enable.sh",
+    "vitals-stack": "remote_vitals_stack.sh",
 }
 
 

@@ -1,0 +1,18 @@
+[Unit]
+Description=MediCentral HL7 TCP gateway (Node) -> POST /api/vitals
+After=network.target clinicmonitoring-vitals-api.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clinicmonitoring/gateway
+Environment=GATEWAY_HOST=0.0.0.0
+Environment=GATEWAY_PORT=6008
+Environment=VITALS_URL=http://127.0.0.1:3040/api/vitals
+Environment=DEBUG=1
+ExecStart=/usr/bin/node /opt/clinicmonitoring/gateway/server.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

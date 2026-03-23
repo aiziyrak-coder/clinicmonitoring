@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HL7 Vitals — Live</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3d8bfd;
+      --border: #2d3a4d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    .status {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      margin-bottom: 1rem;
+    }
+    .status.ok { background: #1a3d2e; color: #7dffb3; }
+    .status.err { background: #3d1a1a; color: #ff9d9d; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th, td {
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: #243044;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(61, 139, 253, 0.06); }
+    .num { font-variant-numeric: tabular-nums; }
+    #rows:empty::after {
+      content: "Waiting for vitals…";
+      display: block;
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <h1>HL7 Vitals — Real-time</h1>
+  <p class="sub">WebSocket stream from gateway → API. Latest rows first.</p>
+  <div id="wsStatus" class="status err">WebSocket: disconnected</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>HR</th>
+        <th>SpO₂</th>
+        <th>BP</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const MAX_ROWS = 100;
+    const rowsEl = document.getElementById("rows");
+    const statusEl = document.getElementById("wsStatus");
+
+    /** Derive WebSocket URL from page origin */
+    function wsUrl() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      return `${proto}//${location.host}/hl7-vitals-ws`;
+    }
+
+    const state = { rows: [] };
+
+    function fmtBp(r) {
+      if (r.systolic != null && r.diastolic != null) {
+        return `${r.systolic}/${r.diastolic}`;
+      }
+      return "—";
+    }
+
+    function render() {
+      rowsEl.innerHTML = "";
+      for (const r of state.rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="num">${escapeHtml(r.device_id)}</td>
+          <td class="num">${r.heart_rate != null ? r.heart_rate : "—"}</td>
+          <td class="num">${r.spo2 != null ? r.spo2 : "—"}</td>
+          <td class="num">${fmtBp(r)}</td>
+          <td>${escapeHtml(r.timestamp || r.received_at || "")}</td>
+        `;
+        rowsEl.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function connect() {
+      const url = wsUrl();
+      const ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        statusEl.textContent = "WebSocket: connected";
+        statusEl.className = "status ok";
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = "WebSocket: disconnected (reconnecting…)";
+        statusEl.className = "status err";
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {
+        statusEl.textContent = "WebSocket: error";
+        statusEl.className = "status err";
+      };
+
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "vitals" && msg.record) {
+            const rec = msg.record;
+            state.rows.unshift(rec);
+            if (state.rows.length > MAX_ROWS) state.rows.pop();
+            render();
+          }
+        } catch (_) {
+          /* ignore */
+        }
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>

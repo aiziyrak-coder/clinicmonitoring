@@ -1,0 +1,11 @@
+{
+  "name": "hl7-local-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local HL7 TCP gateway → HTTP POST vitals to cloud API",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
