@@ -257,6 +257,9 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
         validated_data.setdefault("model", "")
         validated_data.setdefault("hl7_enabled", True)
         validated_data.setdefault("hl7_port", 6006)
+        # Yangi qurilmalar: K12 tavsiyasi — MLLP salom yoqilgan (UI «Yoqish (K12 tavsiya)»)
+        if "hl7_connect_handshake" not in validated_data:
+            validated_data["hl7_connect_handshake"] = True
         return super().create(validated_data)
 
     def to_representation(self, instance: MonitorDevice) -> dict[str, Any]:

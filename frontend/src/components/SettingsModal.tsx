@@ -105,6 +105,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
     summary: string;
     warnings: string[];
     hints: string[];
+    checkTone: 'success' | 'warning' | 'info';
     hl7: Record<string, unknown>;
     hl7Diagnostic: Record<string, unknown>;
     firewallHints: string[];
@@ -186,12 +187,22 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
         setError(data.detail ? `${data.error}: ${String(data.detail)}` : data.error);
         return;
       }
+      const toneRaw = data.checkTone;
+      const checkTone: 'success' | 'warning' | 'info' =
+        toneRaw === 'success' || toneRaw === 'warning' || toneRaw === 'info'
+          ? toneRaw
+          : Boolean(data.allOk)
+            ? 'success'
+            : Array.isArray(data.warnings) && (data.warnings as string[]).length > 0
+              ? 'warning'
+              : 'info';
       setConnectionCheck({
         deviceId,
         allOk: Boolean(data.allOk),
         summary: String(data.summary ?? ''),
         warnings: Array.isArray(data.warnings) ? (data.warnings as string[]) : [],
         hints: Array.isArray(data.hints) ? (data.hints as string[]) : [],
+        checkTone,
         hl7: typeof data.hl7 === 'object' && data.hl7 !== null ? (data.hl7 as Record<string, unknown>) : {},
         hl7Diagnostic:
           typeof data.hl7Diagnostic === 'object' && data.hl7Diagnostic !== null
@@ -580,9 +591,9 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                         role="status"
                         aria-live="polite"
                         className={`rounded-xl border p-4 text-sm ${
-                          connectionCheck.allOk
+                          connectionCheck.checkTone === 'success'
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                            : connectionCheck.warnings.length > 0
+                            : connectionCheck.checkTone === 'warning'
                               ? 'bg-amber-500/10 border-amber-500/30 text-amber-100'
                               : 'bg-sky-500/10 border-sky-500/25 text-sky-100'
                         }`}
@@ -591,11 +602,11 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                           <div>
                             <div className="font-bold text-white mb-1">
                               Ulanish tekshiruvi:{' '}
-                              {connectionCheck.allOk
+                              {connectionCheck.checkTone === 'success'
                                 ? 'OK'
-                                : connectionCheck.warnings.length > 0
+                                : connectionCheck.checkTone === 'warning'
                                   ? 'Diqqat'
-                                  : 'Holat'}
+                                  : "Ma'lumot"}
                             </div>
                             <p className="text-zinc-300 mb-2">{connectionCheck.summary}</p>
                             <ul className="list-disc list-inside space-y-1 text-zinc-400">

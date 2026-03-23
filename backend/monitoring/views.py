@@ -129,23 +129,16 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
             has_hl7_bytes = hl7_diag.get("lastPayloadAtMs") is not None
             last_empty_tcp = hl7_diag.get("lastEmptySessionTcpBytes")
             
-            # K12 / 0 bayt muammosi uchun maxsus tekshiruv
+            # K12 / 0 bayt: TCP sessiyalar bor, lekin MSH+ HL7 hali yo'q (odatda qurilma tomoni)
             is_k12_zero_byte = (
-                hl7_enabled and 
-                hl7_rx_ms is None and 
-                tcp_no_hl7 >= 1 and 
-                not has_hl7_bytes
+                hl7_enabled
+                and hl7_rx_ms is None
+                and tcp_no_hl7 >= 1
+                and not has_hl7_bytes
             )
-            
-            if is_k12_zero_byte:
-                warnings.append(
-                    "K12 ZERO BYTE MUAMMO: TCP ulanish bo'lyapti, lekin HL7 ma'lumot 0 bayt. "
-                    "Qurilmada: 1) Menu → ORU → Enable, 2) Sensorlar ulangan (ECG lead on), "
-                    "3) HL7/MLLP protocol to'g'ri."
-                )
-            
+
             if hl7_enabled:
-                if hl7_rx_ms is None:
+                if hl7_rx_ms is None and not is_k12_zero_byte:
                     hints.append(
                         "HL7: hali MSH paket kelmagan — «onlayn» ba'zan faqat TCP; vitallar HL7 kelgach."
                     )
@@ -154,10 +147,25 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                         + str(hl7_port)
                         + " (TCP, HTTPS emas)."
                     )
-                    if is_k12_zero_byte:
-                        hints.append(
-                            "K12 maxsus: Admin panelda 'Qo'llab-quvvatlash' → 'ORU so'rovini yuborish' ni bosing."
-                        )
+                elif hl7_rx_ms is None and is_k12_zero_byte:
+                    hints.append(
+                        "HL7: TCP ulanishi qayd etilgan, lekin MSH paket hali yo'q — quyidagi K12 qadamlarni tekshiring."
+                    )
+                    hints.append(
+                        "Qurilma: Menu → Internet → HL7 — server VPS tashqi IP, port "
+                        + str(hl7_port)
+                        + ", protokol HL7/MLLP."
+                    )
+                    hints.append(
+                        "Menu → ORU yoki Numerics / markaziy stansiya — yuborish yoqilgan, interval 5–10 s."
+                    )
+                    hints.append(
+                        "Sensorlar: ECG elektrod (lead on), SpO2, NIBP — ulangan bo'lmasa ko'p K12 HL7 yubormaydi."
+                    )
+                    hints.append(
+                        "Server Daphne har ulanishda ORU/MLLP sinovlarini avtomatik bajaradi — "
+                        "journalctl -u clinicmonitoring-daphne -n 80 da «ORU so'rovi» / «handshake» qatorlari."
+                    )
                 elif not is_receiving:
                     warnings.append(
                         f"Oxirgi HL7 paket {int(seconds_since or 0)} s oldin (chegara {int(threshold_sec)} s)."
@@ -179,19 +187,23 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     hs = device.hl7_connect_handshake
                     if hs is True:
                         hints.append(
-                            "Oxirgi sessiya: TCP 0 bayt, MLLP salom yoqilgan — RST bo'lsa salomni o'chiring; ORU/datchiklar."
+                            "Oxirgi sessiya: TCP 0 bayt, «HL7 salom» yoqilgan — RST yoki 0 bayt bo'lsa «O'chirish» ni sinang."
+                        )
+                    elif hs is False:
+                        hints.append(
+                            "Oxirgi sessiya: TCP 0 bayt (salom o'chiq) — ORU menyusi, sensorlar, firewall 6006."
                         )
                     else:
                         hints.append(
-                            "Oxirgi sessiya: TCP 0 bayt (salom o'chiq) — K12 dan HL7 kutilmoqda: ORU, vitallar ekranda, firewall 6006."
+                            "Oxirgi sessiya: TCP 0 bayt — «HL7 salom» Muhit (.env): HL7_SEND_CONNECT_HANDSHAKE."
                         )
                 elif empty_n > 0:
                     hints.append(
-                        f"Oxirgi sessiya: TCP {empty_n} bayt, MSH yo'q — kodlash/freyming. Kerak bo'lsa HL7_DEBUG / journalctl."
+                        f"Oxirgi sessiya: TCP {empty_n} bayt, MSH yo'q — kodlash/freyming. HL7_DEBUG / journalctl."
                     )
             if hl7_enabled and tcp_no_hl7 >= 2 and not has_hl7_bytes:
                 hints.append(
-                    "Bir nechta TCP sessiya HL7siz — firewall 6006 va monitor chiqishini tekshiring."
+                    "Bir nechta TCP sessiya HL7siz — bulut firewall 6006 va monitor HL7 chiqishi."
                 )
             
             server_listen_ok = (not hl7_enabled) or (thread_alive and port_accepts and not be)
@@ -202,8 +214,24 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 data_flow_ok = last_seen_ms is not None and is_receiving
             all_ok = bool(server_listen_ok and pipeline_ok and data_flow_ok)
 
+            # UI: server/pipeline haqiqiy xato bo'lsa «warning», faqat K12 kutilayotgan bo'lsa «info»
+            if all_ok:
+                check_tone = "success"
+            elif warnings:
+                check_tone = "warning"
+            else:
+                check_tone = "info"
+
             summary_parts: list[str] = []
-            if server_listen_ok and hl7_enabled:
+            k12_full_summary = (
+                hl7_enabled
+                and hl7_rx_ms is None
+                and bed_assigned
+                and patient_on_bed
+                and server_listen_ok
+                and is_k12_zero_byte
+            )
+            if server_listen_ok and hl7_enabled and not k12_full_summary:
                 summary_parts.append("HL7 server tinglayapti.")
             elif not hl7_enabled:
                 summary_parts.append("HL7 o'chirilgan (faqat REST vitals).")
@@ -211,7 +239,10 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                 if hl7_rx_ms is None:
                     if bed_assigned and patient_on_bed and server_listen_ok:
                         if is_k12_zero_byte:
-                            summary_parts.append("K12 ZERO BYTE: Qurilma TCP ulanadi, lekin HL7 yubormaydi.")
+                            summary_parts.append(
+                                "HL7 server tinglayapti. TCP ulanishi bor; MSH+ HL7 hali kelmagan — "
+                                "K12: ORU / sensorlar / HL7 menyusi (pastdagi qadamlar)."
+                            )
                         else:
                             summary_parts.append("Server tayyor; HL7 paket monitor dan kutilmoqda.")
                     else:
@@ -269,6 +300,7 @@ class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
                     "warnings": warnings,
                     "hints": hints,
                     "summary": " ".join(summary_parts),
+                    "checkTone": check_tone,
                 }
             )
         except Exception as exc:
