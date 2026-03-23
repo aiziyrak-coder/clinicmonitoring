@@ -20,7 +20,9 @@ HL7 diagnostika (server .env da HL7_DEBUG=true, Daphne restart):
   python deploy/deploy_remote.py reset-fresh         # baza tozalash + K12 noldan + Daphne restart
 
 Muhit:
-  SSH_PASSWORD yoki argv[1] — parol
+  SSH_PASSWORD yoki oxirgi argv — parol (ixtiyoriy, agar kalit bo'lsa)
+  SSH_PRIVATE_KEY_PATH — maxsus kalit fayli (bo'sh bo'lsa: ~/.ssh/id_ed25519, id_rsa, id_ecdsa)
+  SSH_KEY_PASSPHRASE — shifrlangan kalit uchun
   DEPLOY_HOST (default 167.71.53.238), DEPLOY_USER (default root)
   CERTBOT_EMAIL (default admin@ziyrak.org)
   APP_ROOT (default /opt/clinicmonitoring)
@@ -59,6 +61,66 @@ SCRIPTS = {
     "k12-setup": "remote_k12_setup_monitor.sh",
     "reset-fresh": "remote_reset_monitoring_fresh.sh",
 }
+
+
+def _key_passphrase() -> str | None:
+    p = os.environ.get("SSH_KEY_PASSPHRASE", "").strip()
+    return p if p else None
+
+
+def _load_ssh_private_key() -> "paramiko.PKey | None":
+    """
+    SSH_PRIVATE_KEY_PATH yoki ~/.ssh/id_ed25519, id_rsa, id_ecdsa (birinchi ochilgan).
+    """
+    paths: list[Path] = []
+    env_p = os.environ.get("SSH_PRIVATE_KEY_PATH", "").strip()
+    if env_p:
+        paths.append(Path(env_p).expanduser())
+    ssh_dir = Path.home() / ".ssh"
+    for name in ("id_ed25519", "id_rsa", "id_ecdsa"):
+        paths.append(ssh_dir / name)
+    seen: set[str] = set()
+    pp = _key_passphrase()
+    for path in paths:
+        if not path.is_file():
+            continue
+        key = str(path.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        for Loader in (
+            paramiko.Ed25519Key,
+            paramiko.RSAKey,
+            paramiko.ECDSAKey,
+        ):
+            try:
+                return Loader.from_private_key_file(str(path), password=pp)
+            except Exception:
+                continue
+    return None
+
+
+def _connect_ssh(
+    client: "paramiko.SSHClient",
+    *,
+    password: str | None,
+    pkey: "paramiko.PKey | None",
+) -> None:
+    kw: dict = {"hostname": HOST, "username": USER, "timeout": 60}
+    if pkey is not None:
+        kw["pkey"] = pkey
+    if password:
+        kw["password"] = password
+    if pkey is None and not password:
+        print(
+            "SSH: parol (SSH_PASSWORD) yoki SSH kalit kerak.\n"
+            "  Parol: set SSH_PASSWORD=... yoki python deploy/deploy_remote.py update PAROL\n"
+            "  Kalit: serverda ~/.ssh/authorized_keys ga publik kalitingizni qo'shing; "
+            "lokal ~/.ssh/id_ed25519 yoki id_rsa ishlatiladi (yoki SSH_PRIVATE_KEY_PATH=...).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    client.connect(**kw)
 
 
 def _configure_stdio() -> None:
@@ -138,10 +200,12 @@ def main() -> None:
     password = os.environ.get("SSH_PASSWORD")
     if not password and args:
         password = args[-1]
-    if not password:
+    deploy_pkey = _load_ssh_private_key()
+    if not password and deploy_pkey is None:
         print("SSH_PASSWORD muhit o'zgaruvchisi yoki parolni argument sifatida bering.", file=sys.stderr)
         print("  set SSH_PASSWORD=... && python deploy/deploy_remote.py update", file=sys.stderr)
         print("  python deploy/deploy_remote.py update YOUR_PASSWORD", file=sys.stderr)
+        print("  Yoki SSH kalit: ~/.ssh/id_ed25519 (serverda authorized_keys).", file=sys.stderr)
         sys.exit(1)
 
     if gemini_only:
@@ -152,7 +216,7 @@ def main() -> None:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         print(f"Ulanmoqda {USER}@{HOST} — gemini-inject (backend/.env + Daphne restart)...")
-        client.connect(HOST, username=USER, password=password, timeout=60)
+        _connect_ssh(client, password=password, pkey=deploy_pkey)
         try:
             _inject_gemini_and_restart(client)
         except Exception as exc:
@@ -171,7 +235,7 @@ def main() -> None:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print(f"Ulanmoqda {USER}@{HOST} — {mode} ({script_name})...")
-    client.connect(HOST, username=USER, password=password, timeout=60)
+    _connect_ssh(client, password=password, pkey=deploy_pkey)
 
     remote_sh = f"/tmp/clinicmonitoring_{mode}.sh"
     sftp = client.open_sftp()
