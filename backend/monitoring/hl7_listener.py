@@ -405,6 +405,7 @@ def _touch_device_online_on_connect(peer_ip: str) -> None:
 def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
     peer_raw = addr[0]
     peer_ip = _normalize_peer_ip(peer_raw)
+    logger.info("HL7: Yangi TCP ulanish qabul qilindi peer=%s (raw=%s)", peer_ip, peer_raw)
     try:
         from django.db import close_old_connections
 
@@ -430,6 +431,9 @@ def _handle_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
         raws, total_tcp_in = _recv_all_hl7_payloads(
             conn, peer_ip, initial=pre_handshake_data
         )
+        
+        logger.info("HL7: TCP sessiya yakunlandi peer=%s, jami_payload=%s, jami_bytes=%s", 
+                    peer_ip, len(raws), total_tcp_in)
         if not raws:
             from monitoring.device_integration import is_loopback_peer_ip
 
@@ -503,25 +507,36 @@ def _process_hl7_text(text: str, raw: bytes, peer_ip: str, peer_raw: str) -> Non
     )
     from monitoring.hl7_parser import hl7_segment_type_summary, parse_hl7_vitals_best
 
+    logger.info("HL7: Ma'lumot qayta ishlanmoqda peer=%s, matn_uzunligi=%s", peer_ip, len(text))
+    
     device = resolve_hl7_device_by_peer_ip(peer_ip, allow_nat_loopback=True)
     if not device:
-        logger.warning(
-            "HL7: manzil mos kelmedi — ulanish manbasi: %s (xom: %s). "
-            "Admin: MonitorDevice da ip_address/local_ip yoki hl7_peer_ip (NAT tashqi IP) ni tekshiring; "
-            "yoki bitta HL7 qurilma uchun HL7_NAT_SINGLE_DEVICE_FALLBACK=true (standart).",
-            peer_ip,
-            peer_raw,
+        logger.error(
+            "HL7: QURILMA TOPILMADI — peer=%s (raw=%s). "
+            "Yechim: 1) Admin panelda MonitorDevice yarating, 2) ip_address yoki local_ip=%s kiriting, "
+            "3) hl7_enabled=True, 4) bed biriktiring, 5) bemorni qabul qiling. "
+            "Yoki HL7_NAT_SINGLE_DEVICE_FALLBACK=true (bitta qurilma uchun avto-bog'lash).",
+            peer_ip, peer_raw, peer_ip
         )
         return
 
+    logger.info("HL7: Qurilma topildi device=%s (bed=%s)", device.id, device.bed_id)
+    
     vitals = parse_hl7_vitals_best(raw)
+    logger.info("HL7: Parser natijasi: %s", vitals)
+    
     if vitals:
-        apply_vitals_payload(device, vitals, mark_online=True)
-        logger.info(
-            "HL7: vitallar qabul qilindi — qurilma=%s peer=%s",
-            device.id,
-            peer_ip,
-        )
+        result = apply_vitals_payload(device, vitals, mark_online=True)
+        if result:
+            logger.info(
+                "HL7: Vitallar SAQLANDI — qurilma=%s, bemor=%s, vitals=%s",
+                device.id, result.id, vitals
+            )
+        else:
+            logger.warning(
+                "HL7: Vitallar saqlanmadi — qurilma=%s da bed yoki bemor bog'lanmagan",
+                device.id
+            )
     else:
         mark_device_online_only(device)
         logger.warning(

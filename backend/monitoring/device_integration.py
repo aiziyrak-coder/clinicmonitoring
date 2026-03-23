@@ -135,33 +135,45 @@ def apply_vitals_payload(
 ) -> Patient | None:
     """REST yoki HL7 dan kelgan vitallarni saqlash va `vitals_update` yuborish."""
     now_ms = int(time.time() * 1000)
+    
+    # Qurilma online holatini yangilash
     if mark_online:
         device.status = MonitorDevice.Status.ONLINE
         device.last_seen = now_ms
         device.save(update_fields=["status", "last_seen"])
+        logger.info("Device %s ONLINE holatga o'tkazildi", device.id)
 
     vital_keys = ("hr", "spo2", "nibpSys", "nibpDia", "rr", "temp")
     has_vitals = any(
         k in payload and payload[k] is not None for k in vital_keys
     )
+    
+    logger.info("Device %s: vitals tekshirilmoqda payload=%s has_vitals=%s", 
+                device.id, payload, has_vitals)
+    
     if not has_vitals:
+        logger.warning("Device %s: payload da vitallar yo'q", device.id)
         return None
 
     if not device.bed_id:
-        logger.warning(
-            "Vitals: qurilmada joy (bed) biriktirilmagan — vitallar saqlanmaydi. device=%s",
+        logger.error(
+            "Vitals: qurilmada JOY (BED) BIRIKTIRILMAGAN — vitallar saqlanmaydi. "
+            "Admin panelda device=%s ga bed biriktiring!",
             device.id,
         )
         return None
 
     patient = Patient.objects.select_for_update().filter(bed=device.bed).first()
     if not patient:
-        logger.warning(
-            "Vitals: shu karavatta bemor yo'q — vitallar saqlanmaydi. device=%s bed=%s",
+        logger.error(
+            "Vitals: shu karavatta BEMOR YO'Q — vitallar saqlanmaydi. "
+            "device=%s bed=%s. Admin panelda bemorni qabul qiling!",
             device.id,
             device.bed_id,
         )
         return None
+    
+    logger.info("Device %s: bemor topildi patient=%s", device.id, patient.id)
 
     if "hr" in payload and payload["hr"] is not None:
         patient.hr = int(payload["hr"])

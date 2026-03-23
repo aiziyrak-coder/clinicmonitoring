@@ -489,11 +489,18 @@ def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
     UTF-8, CP1251 va latin-1 bilan sinab, eng ko'p maydonni to'ldirgan natijani tanlaydi,
     qolgan kodlashlardan yetishmayotgan kalitlarni qo'shadi (bir xil xabarda aralash kodlash).
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     raw = raw.lstrip(b"\xef\xbb\xbf")
     if raw.startswith(b"\xff\xfe"):
         raw = raw[2:]
     elif raw.startswith(b"\xfe\xff"):
         raw = raw[2:]
+    
+    logger.info("HL7 parser: raw uzunlik=%s, birinchi_100_bayt=%s", 
+                len(raw), raw[:100])
+    
     candidates: list[tuple[int, dict[str, Any]]] = []
     for enc in ("utf-8", "utf-16-le", "utf-16-be", "cp1251", "latin-1", "gbk"):
         try:
@@ -505,12 +512,18 @@ def parse_hl7_vitals_best(raw: bytes) -> dict[str, Any]:
         v = parse_hl7_vitals(t)
         if v:
             candidates.append((len(v), v))
+            logger.info("HL7 parser: encoding=%s natija=%s", enc, v)
+    
     if not candidates:
+        logger.warning("HL7 parser: HECH QANDAY VITAL TOPILMADI!")
         return {}
+    
     candidates.sort(key=lambda x: -x[0])
     merged = dict(candidates[0][1])
     for _, v in candidates[1:]:
         for k, val in v.items():
             if k not in merged:
                 merged[k] = val
+    
+    logger.info("HL7 parser: YAKUNIY natija=%s", merged)
     return merged
