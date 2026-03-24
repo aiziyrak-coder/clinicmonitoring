@@ -27,6 +27,9 @@ Muhit:
   SSH_PRIVATE_KEY_PATH — maxsus kalit fayli (bo'sh bo'lsa: ~/.ssh/id_ed25519, id_rsa, id_ecdsa)
   SSH_KEY_PASSPHRASE — shifrlangan kalit uchun
   DEPLOY_HOST (default 167.71.53.238), DEPLOY_USER (default root)
+  SSH_KNOWN_HOSTS — qo'shimcha known_hosts fayli (ixtiyoriy)
+  SSH_ALLOW_UNKNOWN_HOST=1 — birinchi ulanishda host kalitini avto qo'shish (MITM xavfi; faqat dev)
+  SSH_STRICT_HOST_KEY — eski nom; unknown host uchun RejectPolicy (SSH_ALLOW_UNKNOWN_HOST bo'lmasa)
   CERTBOT_EMAIL (default admin@ziyrak.org)
   APP_ROOT (default /opt/clinicmonitoring)
   DEPLOY_GEMINI_KEY — bo'sh bo'lmasa, deploydan keyin serverda backend/.env ga
@@ -104,6 +107,35 @@ def _load_ssh_private_key() -> "paramiko.PKey | None":
             except Exception:
                 continue
     return None
+
+
+def _make_ssh_client() -> "paramiko.SSHClient":
+    """
+    known_hosts dan tekshiruv; SSH_ALLOW_UNKNOWN_HOST=1 bo'lmasa noma'lum host rad etiladi.
+    Birinchi marta: ssh-keyscan DEPLOY_HOST >> ~/.ssh/known_hosts
+    """
+    client = paramiko.SSHClient()
+    allow_unknown = os.environ.get("SSH_ALLOW_UNKNOWN_HOST", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    kh_paths: list[Path] = []
+    env_kh = os.environ.get("SSH_KNOWN_HOSTS", "").strip()
+    if env_kh:
+        kh_paths.append(Path(env_kh).expanduser())
+    kh_paths.append(Path.home() / ".ssh" / "known_hosts")
+    for path in kh_paths:
+        if path.is_file():
+            try:
+                client.load_host_keys(str(path))
+            except OSError:
+                continue
+    if allow_unknown:
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    else:
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    return client
 
 
 def _connect_ssh(
@@ -219,8 +251,7 @@ def main() -> None:
         if not key:
             print("DEPLOY_GEMINI_KEY muhit o'zgaruvchisi kerak (kalitni repoga qo'ymang).", file=sys.stderr)
             sys.exit(1)
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client = _make_ssh_client()
         print(f"Ulanmoqda {USER}@{HOST} — gemini-inject (backend/.env + Daphne restart)...")
         _connect_ssh(client, password=password, pkey=deploy_pkey)
         try:
@@ -238,8 +269,7 @@ def main() -> None:
         print(f"Skript topilmadi: {script_path}", file=sys.stderr)
         sys.exit(1)
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = _make_ssh_client()
     print(f"Ulanmoqda {USER}@{HOST} — {mode} ({script_name})...")
     _connect_ssh(client, password=password, pkey=deploy_pkey)
 

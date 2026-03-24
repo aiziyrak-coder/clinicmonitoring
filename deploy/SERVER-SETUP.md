@@ -88,6 +88,8 @@ sudo ln -sf /etc/nginx/sites-available/clinicmonitoring /etc/nginx/sites-enabled
 sudo nginx -t
 ```
 
+**nginx versiyasi:** repodagi konfig `http2 on;` (nginx **1.25+**). Agar serverda **nginx 1.18** (Ubuntu 22.04 standart) bo‘lsa va `nginx -t` xato bersa, `server` bloklarida `listen 443 ssl;` + `http2 on;` o‘rniga `listen 443 ssl http2;` qoldiring.
+
 **certbot** (domenlar DNS bilan IP ga tushganini tekshiring):
 
 ```bash

@@ -59,7 +59,7 @@ Brauzer: `http://127.0.0.1:5173` — Vite `vite.config.ts` orqali `/api` va `/ws
 **Backend** (`DJANGO_DEBUG=false`):
 
 - `DJANGO_SECRET_KEY` — majburiy, tasodifiy uzun qator.
-- `DJANGO_ALLOWED_HOSTS` — API domenlari (vergul bilan).
+- `DJANGO_ALLOWED_HOSTS` — API domenlari (vergul bilan); **`*` ishlatilmaydi** (Host header hujumlaridan himoya).
 - `CORS_ALLOWED_ORIGINS` — frontend HTTPS URL (vergul bilan).
 - `DJANGO_CSRF_TRUSTED_ORIGINS` — admin/formalar uchun kerak bo‘lsa.
 - **Bir nechta server/pod:** `REDIS_URL` + `channels-redis` (WebSocket kanallari sinxroni); aks holda faqat bitta jarayonda InMemory ishlaydi.
@@ -110,7 +110,9 @@ GitHub Actions: `frontend` (npm ci, lint, build), `backend` (pip, check, migrate
 
 Serverda publik kalit `authorized_keys` da bo‘lishi kerak. Ish jarayoni: `deploy/remote_full_update.sh` (git pull, migrate, `npm run build`, nginx, `systemctl restart clinicmonitoring-daphne`).
 
-Mahalliy masofadan: `python deploy/deploy_remote.py update` (`SSH_PASSWORD` yoki `~/.ssh/id_ed25519`).
+Mahalliy masofadan: `python deploy/deploy_remote.py update` (`SSH_PASSWORD` yoki `~/.ssh/id_ed25519`). Birinchi ulanish: `ssh-keyscan DEPLOY_HOST >> ~/.ssh/known_hosts` (yoki vaqtincha `SSH_ALLOW_UNKNOWN_HOST=1` — faqat ishonchli tarmoqda).
+
+**nginx 1.25+** uchun repodagi `http2 on;` sintaksisi; **nginx 1.18** (Ubuntu 22.04 standart) bo‘lsa, `listen 443 ssl http2;` qoldiring (`deploy/nginx-clinicmonitoring.conf` ni moslashtiring).
 
 **Qo‘lda server:** GitHub → **Actions** → **Server (manual)** → *Run workflow* → `deploy` (to‘liq yangilash) yoki `restart` (faqat `clinicmonitoring-daphne` restart + journal).
 

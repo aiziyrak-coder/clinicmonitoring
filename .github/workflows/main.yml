@@ -1,5 +1,8 @@
 name: MediCentral CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main, master]
@@ -20,6 +23,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run build
 
@@ -36,6 +40,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
       - run: python manage.py check
       - run: python manage.py migrate --noinput
       - name: Smoke /api/health/
@@ -75,6 +81,16 @@ jobs:
           python-version: "3.12"
       - name: Install paramiko
         run: pip install paramiko
+      - name: Server SSH host key (known_hosts)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          H="${DEPLOY_HOST:-}"
+          if [ -z "$H" ]; then H=167.71.53.238; fi
+          ssh-keyscan -H "$H" >> ~/.ssh/known_hosts
       - name: Remote update (SSH)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}

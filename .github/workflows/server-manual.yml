@@ -2,6 +2,9 @@
 # Secret: DEPLOY_SSH_KEY (majburiy). Ixtiyoriy: DEPLOY_HOST, DEPLOY_USER
 name: Server (manual)
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -28,6 +31,16 @@ jobs:
           python-version: "3.12"
       - name: Install paramiko
         run: pip install paramiko
+      - name: Server SSH host key (known_hosts)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          H="${DEPLOY_HOST:-}"
+          if [ -z "$H" ]; then H=167.71.53.238; fi
+          ssh-keyscan -H "$H" >> ~/.ssh/known_hosts
       - name: SSH — deploy yoki restart
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}

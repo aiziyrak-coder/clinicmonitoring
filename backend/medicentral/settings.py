@@ -40,6 +40,13 @@ if not SECRET_KEY:
 ALLOWED_HOSTS_STR = os.environ.get("DJANGO_ALLOWED_HOSTS", "*")
 ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()]
 
+if not DEBUG:
+    if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+        raise ImproperlyConfigured(
+            "DJANGO_ALLOWED_HOSTS ni aniq domen/IP ro'yxati qilib bering (vergul bilan); "
+            "DEBUG=false da '*' yoki bo'sh qoldirish mumkin emas (Host header hujumlari)."
+        )
+
 _csrf = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf.split(",") if x.strip()]
 
@@ -158,6 +165,9 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", True)
     CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_HTTPONLY = True
     if _env_bool("DJANGO_SECURE_SSL_REDIRECT", False):
         SECURE_SSL_REDIRECT = True
         SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000"))

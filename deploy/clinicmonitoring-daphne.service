@@ -12,6 +12,8 @@ EnvironmentFile=/opt/clinicmonitoring/backend/.env
 ExecStart=/opt/clinicmonitoring/backend/.venv/bin/daphne -b 127.0.0.1 -p 8012 medicentral.asgi:application
 Restart=on-failure
 RestartSec=5
+PrivateTmp=yes
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target
