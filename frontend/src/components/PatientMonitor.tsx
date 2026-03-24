@@ -71,11 +71,11 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
   }, [nextCheckTime]);
 
   const alarmStyles = {
-    none: 'border-zinc-700/80 bg-zinc-900/60 hover:bg-zinc-800/80 backdrop-blur-md shadow-lg',
-    blue: 'border-blue-500/80 bg-blue-950/40 animate-pulse hover:bg-blue-900/50 backdrop-blur-md shadow-[0_0_10px_rgba(59,130,246,0.2)]',
-    yellow: 'border-yellow-500/80 bg-yellow-950/40 animate-pulse hover:bg-yellow-900/50 backdrop-blur-md shadow-[0_0_10px_rgba(234,179,8,0.2)]',
-    red: 'border-red-500 bg-red-950/50 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)] hover:bg-red-900/60 backdrop-blur-md',
-    purple: 'border-purple-500 bg-purple-950/50 animate-pulse shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:bg-purple-900/60 backdrop-blur-md',
+    none: 'border-zinc-200 bg-white hover:bg-zinc-50 shadow-md shadow-zinc-200/50',
+    blue: 'border-blue-400 bg-blue-50 animate-pulse hover:bg-blue-100 shadow-md shadow-blue-100/80',
+    yellow: 'border-amber-400 bg-amber-50 animate-pulse hover:bg-amber-100 shadow-md shadow-amber-100/80',
+    red: 'border-red-500 bg-red-50 animate-pulse shadow-lg shadow-red-200/60 hover:bg-red-100',
+    purple: 'border-purple-500 bg-purple-50 animate-pulse shadow-lg shadow-purple-200/60 hover:bg-purple-100',
   };
 
   const maskedName = privacyMode
@@ -116,7 +116,7 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             <h3 className={cn(
-              "font-semibold text-zinc-100 group-hover:text-emerald-400 transition-colors truncate",
+              "font-bold text-zinc-900 group-hover:text-emerald-800 transition-colors truncate",
               isSmall ? "text-[10px]" : isMedium ? "text-xs" : "text-sm"
             )}>
               {maskedName}
@@ -132,16 +132,16 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
           </div>
           {!isSmall && (
             <div className="flex items-center space-x-1 mt-0.5">
-              <p className="text-[8px] text-zinc-400 font-mono bg-zinc-800/50 px-1 py-0.5 rounded truncate">{patient.room}</p>
+              <p className="text-[8px] text-zinc-700 font-mono bg-zinc-100 px-1 py-0.5 rounded truncate font-medium">{patient.room}</p>
               {isLarge && (
-                <div className="flex items-center text-[9px] text-zinc-500 min-w-0" title="Mas'ul shifokor / Hamshira">
+                <div className="flex items-center text-[9px] text-zinc-600 min-w-0" title="Mas'ul shifokor / Hamshira">
                   <UserCircle className="w-2.5 h-2.5 mr-1 shrink-0" />
                   <span className="truncate">{doctor} / {patient.assignedNurse}</span>
                 </div>
               )}
             </div>
           )}
-          {isSmall && <p className="text-[8px] text-zinc-500 truncate">{patient.room}</p>}
+          {isSmall && <p className="text-[8px] text-zinc-600 truncate font-medium">{patient.room}</p>}
         </div>
         
         <div className="flex flex-col items-end space-y-0.5 ml-1 shrink-0 max-w-[50%]">
@@ -162,7 +162,7 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
                 <button 
                   type="button"
                   onClick={(e) => { e.stopPropagation(); clearAlarm(patient.id); }} 
-                  className="ml-1 hover:text-zinc-200 shrink-0"
+                  className="ml-1 hover:text-zinc-800 shrink-0"
                   aria-label="Signalni tozalash"
                 >
                   <X className="w-2.5 h-2.5" />
@@ -175,23 +175,23 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
             <div className="flex space-x-1 items-center mt-0.5">
               <div className={cn(
                 "flex items-center justify-center rounded px-1.5 py-0.5 border text-[9px] font-bold",
-                patient.news2Score >= 7 ? "bg-red-500/20 border-red-500/50 text-red-400" :
-                patient.news2Score >= 5 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" :
-                patient.news2Score >= 1 ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-400" :
-                "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                patient.news2Score >= 7 ? "bg-red-100 border-red-300 text-red-800" :
+                patient.news2Score >= 5 ? "bg-orange-100 border-orange-300 text-orange-900" :
+                patient.news2Score >= 1 ? "bg-amber-100 border-amber-300 text-amber-900" :
+                "bg-emerald-100 border-emerald-300 text-emerald-900"
               )} title="NEWS2 Bali">
                 N: {patient.news2Score}
               </div>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); togglePinPatient(patient.id); }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-zinc-200 rounded text-zinc-600 hover:text-zinc-900"
                 title={patient.isPinned ? "Qadashni bekor qilish" : "Qadab qo'yish"}
               >
                 <Pin className={cn("w-3 h-3", patient.isPinned && "fill-emerald-400 text-emerald-400 opacity-100")} />
               </button>
               {deviceBattery > 0 ? (
-                <div className="flex items-center text-zinc-500" title={`Quvvat: ${Math.round(deviceBattery)}%`}>
+                <div className="flex items-center text-zinc-600" title={`Quvvat: ${Math.round(deviceBattery)}%`}>
                   <Battery className={cn("w-2.5 h-2.5", deviceBattery < 20 ? "text-red-500 animate-pulse" : "")} />
                 </div>
               ) : (
@@ -201,7 +201,7 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
               )}
               <div className="relative flex items-center">
                 {timeLeft !== null && (
-                  <span className="text-[10px] text-purple-400 mr-1 font-mono">
+                  <span className="text-[10px] text-purple-700 mr-1 font-mono font-semibold">
                     {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                   </span>
                 )}
@@ -209,8 +209,8 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setShowScheduleMenu(!showScheduleMenu); }}
                   className={cn(
-                    "text-zinc-500 hover:text-purple-400 transition-colors",
-                    scheduledCheck ? "text-purple-500" : ""
+                    "text-zinc-600 hover:text-purple-700 transition-colors",
+                    scheduledCheck ? "text-purple-800" : ""
                   )} 
                   title="Rejali tekshiruv"
                   aria-expanded={showScheduleMenu}
@@ -223,13 +223,13 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
                   <div
                     ref={scheduleMenuRef}
                     role="menu"
-                    className="absolute right-0 mt-2 w-32 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-20 overflow-hidden"
+                    className="absolute right-0 mt-2 w-32 bg-white border border-zinc-200 rounded-md shadow-lg z-20 overflow-hidden"
                   >
-                    <div className="px-3 py-2 text-xs font-semibold text-zinc-400 border-b border-zinc-700">Interval</div>
-                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 10)} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700">10 soniya</button>
-                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 30)} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700">30 soniya</button>
-                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 60)} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700">1 daqiqa</button>
-                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 0)} className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-zinc-700 border-t border-zinc-700">O'chirish</button>
+                    <div className="px-3 py-2 text-xs font-bold text-zinc-700 border-b border-zinc-200">Interval</div>
+                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 10)} className="w-full text-left px-3 py-2 text-sm text-zinc-900 font-medium hover:bg-zinc-100">10 soniya</button>
+                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 30)} className="w-full text-left px-3 py-2 text-sm text-zinc-900 font-medium hover:bg-zinc-100">30 soniya</button>
+                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 60)} className="w-full text-left px-3 py-2 text-sm text-zinc-900 font-medium hover:bg-zinc-100">1 daqiqa</button>
+                    <button type="button" role="menuitem" onClick={(e) => handleSetSchedule(e, 0)} className="w-full text-left px-3 py-2 text-sm text-red-700 font-medium hover:bg-red-50 border-t border-zinc-200">O'chirish</button>
                   </div>
                 )}
               </div>
@@ -246,24 +246,24 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
         
         {/* HR */}
         <div className={cn(
-          "bg-black/40 rounded flex flex-col justify-between border border-emerald-500/20 overflow-hidden",
+          "bg-emerald-50/90 rounded flex flex-col justify-between border border-emerald-200 overflow-hidden",
           isSmall ? "p-0.5" : "p-1.5",
           isLarge && "col-span-1 row-span-2"
         )}>
           <div className="flex justify-between items-start shrink-0">
-            <span className={cn("text-emerald-500 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>YUCh</span>
-            {!isSmall && <Heart className={cn("w-2.5 h-2.5 text-emerald-500 shrink-0", vitals.hr > 0 ? 'animate-pulse' : '')} />}
+            <span className={cn("text-emerald-800 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>YUCh</span>
+            {!isSmall && <Heart className={cn("w-2.5 h-2.5 text-emerald-700 shrink-0", vitals.hr > 0 ? 'animate-pulse' : '')} />}
           </div>
           <div className="flex items-baseline justify-end flex-1 min-h-0 items-center">
             <span className={cn(
-              "font-bold text-emerald-400 font-mono tracking-tighter truncate leading-none",
+              "font-bold text-emerald-800 font-mono tracking-tighter truncate leading-none",
               isSmall ? "text-sm" : isMedium ? "text-xl" : "text-3xl"
             )}>
               {vitals.hr === 0 ? '---' : vitals.hr}
             </span>
           </div>
           {!isSmall && (
-            <div className="flex justify-between text-[8px] text-emerald-500/50 font-mono shrink-0">
+            <div className="flex justify-between text-[8px] text-emerald-700/80 font-mono shrink-0 font-medium">
               <span>{alarmLimits?.hr?.low ?? '—'}</span>
               <span>{alarmLimits?.hr?.high ?? '—'}</span>
             </div>
@@ -272,24 +272,24 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
 
         {/* SpO2 */}
         <div className={cn(
-          "bg-black/40 rounded flex flex-col justify-between border border-cyan-500/20 overflow-hidden",
+          "bg-cyan-50/90 rounded flex flex-col justify-between border border-cyan-200 overflow-hidden",
           isSmall ? "p-0.5" : "p-1.5",
           isLarge && "col-span-1 row-span-2"
         )}>
           <div className="flex justify-between items-start shrink-0">
-            <span className={cn("text-cyan-400 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>SpO2%</span>
-            {!isSmall && <Droplets className="w-2.5 h-2.5 text-cyan-400 shrink-0" />}
+            <span className={cn("text-cyan-900 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>SpO2%</span>
+            {!isSmall && <Droplets className="w-2.5 h-2.5 text-cyan-700 shrink-0" />}
           </div>
           <div className="flex items-baseline justify-end flex-1 min-h-0 items-center">
             <span className={cn(
-              "font-bold text-cyan-300 font-mono tracking-tighter truncate leading-none",
+              "font-bold text-cyan-800 font-mono tracking-tighter truncate leading-none",
               isSmall ? "text-sm" : isMedium ? "text-xl" : "text-3xl"
             )}>
               {vitals.spo2 === 0 ? '---' : vitals.spo2}
             </span>
           </div>
           {!isSmall && (
-            <div className="flex justify-between text-[8px] text-cyan-500/50 font-mono shrink-0">
+            <div className="flex justify-between text-[8px] text-cyan-800/80 font-mono shrink-0 font-medium">
               <span>{alarmLimits?.spo2?.low ?? '—'}</span>
               <span>{alarmLimits?.spo2?.high ?? '—'}</span>
             </div>
@@ -298,18 +298,18 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
 
         {/* NIBP */}
         <div className={cn(
-          "bg-black/40 rounded flex flex-col justify-between border border-zinc-500/20 relative group/nibp overflow-hidden",
+          "bg-zinc-100 rounded flex flex-col justify-between border border-zinc-300 relative group/nibp overflow-hidden",
           isSmall ? "p-0.5 col-span-2" : "p-1.5",
           isMedium && "col-span-2",
           isLarge && "col-span-1 row-span-1"
         )}>
           <div className="flex justify-between items-start shrink-0">
-            <span className={cn("text-zinc-300 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>AQB</span>
+            <span className={cn("text-zinc-800 font-bold truncate pr-1", isSmall ? "text-[7px]" : "text-[9px]")}>AQB</span>
             {!isSmall && (
               <button 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); measureNibp(patient.id); }}
-                className="opacity-0 group-hover/nibp:opacity-100 transition-opacity p-0.5 bg-zinc-800 rounded text-zinc-300 hover:text-white shrink-0"
+                className="opacity-0 group-hover/nibp:opacity-100 transition-opacity p-0.5 bg-white rounded border border-zinc-300 text-zinc-800 hover:bg-zinc-50 shrink-0"
                 title="O'lchash"
                 aria-label="Qon bosimini o'lchash"
               >
@@ -320,21 +320,21 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
           <div className="flex flex-col items-end justify-center flex-1 min-h-0 overflow-hidden">
             <div className="flex items-baseline truncate max-w-full">
               <span className={cn(
-                "font-bold text-zinc-100 font-mono tracking-tighter truncate leading-none",
+                "font-bold text-zinc-900 font-mono tracking-tighter truncate leading-none",
                 isSmall ? "text-xs" : isMedium ? "text-lg" : "text-xl"
               )}>
                 {vitals.nibpSys === 0 ? '---' : vitals.nibpSys}
               </span>
               <span className="text-zinc-500 mx-0.5 shrink-0 text-xs">/</span>
               <span className={cn(
-                "font-bold text-zinc-100 font-mono tracking-tighter truncate leading-none",
+                "font-bold text-zinc-900 font-mono tracking-tighter truncate leading-none",
                 isSmall ? "text-xs" : isMedium ? "text-lg" : "text-xl"
               )}>
                 {vitals.nibpDia === 0 ? '---' : vitals.nibpDia}
               </span>
             </div>
             {!isSmall && (
-              <span className="text-[8px] text-zinc-500 mt-0.5 truncate max-w-full shrink-0">
+              <span className="text-[8px] text-zinc-600 mt-0.5 truncate max-w-full shrink-0 font-medium">
                 {vitals.nibpTime ? formatDistanceToNow(vitals.nibpTime, { addSuffix: true, locale: uz }) : "O'lchanmagan"}
               </span>
             )}
@@ -344,18 +344,18 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
         {/* RR & Temp (Only for Large) */}
         {isLarge && (
           <div className="flex gap-0.5 col-span-1 row-span-1 min-h-0">
-            <div className="flex-1 bg-black/40 rounded p-1 flex flex-col justify-between border border-yellow-500/20 overflow-hidden">
-              <span className="text-yellow-400 font-bold text-[9px] shrink-0 truncate">NCh</span>
+            <div className="flex-1 bg-amber-50 rounded p-1 flex flex-col justify-between border border-amber-300 overflow-hidden">
+              <span className="text-amber-900 font-bold text-[9px] shrink-0 truncate">NCh</span>
               <div className="flex items-baseline justify-end flex-1 min-h-0 items-center">
-                <span className="text-lg font-bold text-yellow-400 font-mono tracking-tighter truncate leading-none">
+                <span className="text-lg font-bold text-amber-900 font-mono tracking-tighter truncate leading-none">
                   {vitals.rr === 0 ? '---' : vitals.rr}
                 </span>
               </div>
             </div>
-            <div className="flex-1 bg-black/40 rounded p-1 flex flex-col justify-between border border-orange-500/20 overflow-hidden">
-              <span className="text-orange-400 font-bold text-[9px] shrink-0 truncate">Harorat</span>
+            <div className="flex-1 bg-orange-50 rounded p-1 flex flex-col justify-between border border-orange-300 overflow-hidden">
+              <span className="text-orange-900 font-bold text-[9px] shrink-0 truncate">Harorat</span>
               <div className="flex items-baseline justify-end flex-1 min-h-0 items-center">
-                <span className="text-lg font-bold text-orange-400 font-mono tracking-tighter truncate leading-none">
+                <span className="text-lg font-bold text-orange-900 font-mono tracking-tighter truncate leading-none">
                   {typeof vitals.temp === 'number' && vitals.temp > 0 && !Number.isNaN(vitals.temp)
                     ? vitals.temp.toFixed(1)
                     : '---'}

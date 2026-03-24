@@ -23,36 +23,36 @@ function CustomPrompt({ isOpen, title, fields, onSubmit, onCancel }: { isOpen: b
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/30 backdrop-blur-sm p-4"
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6 shadow-2xl"
+        className="bg-white border border-zinc-200 shadow-xl rounded-xl w-full max-w-md p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="document"
       >
-        <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
+        <h3 className="text-lg font-bold text-zinc-900 mb-4">{title}</h3>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(values); }}>
           <div className="space-y-4 mb-6">
             {fields.map(f => (
               <div key={f.name}>
-                <label className="block text-sm text-zinc-400 mb-1">{f.label}</label>
+                <label className="block text-sm font-semibold text-zinc-700 mb-1">{f.label}</label>
                 <input 
                   type="text" 
                   value={values[f.name] || ''}
                   onChange={e => setValues({...values, [f.name]: e.target.value})}
                   placeholder={f.placeholder}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white focus:border-emerald-500 outline-none"
+                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2 text-zinc-900 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                   autoFocus={fields[0].name === f.name}
                 />
               </div>
             ))}
           </div>
           <div className="flex justify-end space-x-3">
-            <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 hover:text-white transition-colors">Bekor qilish</button>
+            <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-600 hover:text-zinc-900 font-medium transition-colors">Bekor qilish</button>
             <button type="submit" className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">Saqlash</button>
           </div>
         </form>
@@ -65,14 +65,14 @@ function CustomConfirm({ isOpen, title, message, onConfirm, onCancel }: { isOpen
   if (!isOpen) return null;
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/30 backdrop-blur-sm p-4"
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm p-6 shadow-2xl"
+        className="bg-white border border-zinc-200 shadow-xl rounded-xl w-full max-w-sm p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
       >
@@ -80,9 +80,9 @@ function CustomConfirm({ isOpen, title, message, onConfirm, onCancel }: { isOpen
           <AlertTriangle className="w-6 h-6" />
           <h3 className="text-lg font-bold">{title}</h3>
         </div>
-        <p className="text-zinc-300 mb-6">{message}</p>
+        <p className="text-zinc-700 font-medium mb-6">{message}</p>
         <div className="flex justify-end space-x-3">
-          <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 hover:text-white transition-colors">Yo'q</button>
+          <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-600 hover:text-zinc-900 font-medium transition-colors">Yo'q</button>
           <button type="button" onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Ha, o'chirish</button>
         </div>
       </div>
@@ -397,7 +397,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/35 backdrop-blur-sm p-4"
       role="presentation"
       onClick={onClose}
     >
@@ -423,53 +423,53 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-modal-title"
-        className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-white border border-zinc-200 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl shadow-zinc-300/50 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-200 bg-zinc-50/90">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-              <Server className="w-6 h-6 text-emerald-500" aria-hidden />
+            <div className="p-2 bg-emerald-100 rounded-lg border border-emerald-200">
+              <Server className="w-6 h-6 text-emerald-700" aria-hidden />
             </div>
             <div>
-              <h2 id="settings-modal-title" className="text-xl font-bold text-white">Tizim Sozlamalari</h2>
-              <p className="text-sm text-zinc-400">Infratuzilma, qurilmalar va integratsiya</p>
+              <h2 id="settings-modal-title" className="text-xl font-bold text-zinc-900">Tizim Sozlamalari</h2>
+              <p className="text-sm text-zinc-600 font-medium">Infratuzilma, qurilmalar va integratsiya</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors" aria-label="Yopish">
+          <button type="button" onClick={onClose} className="p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200 rounded-lg transition-colors" aria-label="Yopish">
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
-          <div className="w-64 border-r border-zinc-800 bg-zinc-900/30 p-4 space-y-2">
+          <div className="w-64 border-r border-zinc-200 bg-zinc-50 p-4 space-y-2">
             <button
               onClick={() => setActiveTab('structure')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'structure' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'structure' ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}
             >
               <Building2 className="w-5 h-5" />
               <span className="font-medium">Tuzilma</span>
             </button>
             <button
               onClick={() => setActiveTab('devices')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'devices' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'devices' ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}
             >
               <MonitorSmartphone className="w-5 h-5" />
               <span className="font-medium">Qurilmalar</span>
             </button>
             <button
               onClick={() => setActiveTab('patients')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'patients' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'patients' ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}
             >
               <Users className="w-5 h-5" />
               <span className="font-medium">Bemorlar</span>
             </button>
             <button
               onClick={() => setActiveTab('integration')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'integration' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'integration' ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}
             >
               <Info className="w-5 h-5" />
               <span className="font-medium">Integratsiya</span>
@@ -477,7 +477,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 bg-zinc-950">
+          <div className="flex-1 overflow-y-auto p-6 bg-white">
             {error && (
               <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-center">
                 <AlertTriangle className="w-5 h-5 mr-3" />
@@ -493,35 +493,35 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium text-white">Kasalxona Tuzilmasi</h3>
-                      <button onClick={addDepartment} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
+                      <button onClick={addDepartment} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-800 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
                         <Plus className="w-4 h-4 mr-1" /> Bo'lim qo'shish
                       </button>
                     </div>
                     
                     <div className="space-y-4">
                       {data.departments.map((dept: any) => (
-                        <div key={dept.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                        <div key={dept.id} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
                           <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-md font-bold text-emerald-400">{dept.name} (ID: {dept.id})</h4>
+                            <h4 className="text-md font-bold text-emerald-800">{dept.name} (ID: {dept.id})</h4>
                             <div className="flex space-x-2">
-                              <button onClick={() => addRoom(dept.id)} className="p-1.5 text-zinc-400 hover:text-emerald-400 bg-zinc-800 rounded-md"><Plus className="w-4 h-4" /></button>
-                              <button onClick={() => deleteDepartment(dept.id)} className="p-1.5 text-zinc-400 hover:text-red-400 bg-zinc-800 rounded-md"><Trash2 className="w-4 h-4" /></button>
+                              <button onClick={() => addRoom(dept.id)} className="p-1.5 text-zinc-600 hover:text-emerald-800 bg-zinc-100 rounded-md"><Plus className="w-4 h-4" /></button>
+                              <button onClick={() => deleteDepartment(dept.id)} className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {data.rooms.filter((r: any) => r.departmentId === dept.id).map((room: any) => (
-                              <div key={room.id} className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3">
+                              <div key={room.id} className="bg-white border border-zinc-200 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium text-zinc-200">{room.name}</span>
+                                  <span className="font-medium text-zinc-900">{room.name}</span>
                                   <div className="flex space-x-2">
-                                    <button onClick={() => addBed(room.id)} className="p-1 text-zinc-500 hover:text-emerald-400"><Plus className="w-3 h-3" /></button>
+                                    <button onClick={() => addBed(room.id)} className="p-1 text-zinc-500 hover:text-emerald-800"><Plus className="w-3 h-3" /></button>
                                     <button onClick={() => deleteRoom(room.id)} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {data.beds.filter((b: any) => b.roomId === room.id).map((bed: any) => (
-                                    <div key={bed.id} className="flex items-center px-2 py-1 bg-zinc-900 rounded text-xs text-zinc-400 border border-zinc-800">
+                                    <div key={bed.id} className="flex items-center px-2 py-1 bg-white rounded text-xs text-zinc-800 border border-zinc-200 font-medium">
                                       {bed.name} (ID: {bed.id})
                                       <button onClick={() => deleteBed(bed.id)} className="ml-2 text-zinc-600 hover:text-red-400"><X className="w-3 h-3" /></button>
                                     </div>
@@ -549,28 +549,28 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                           <button
                             type="button"
                             onClick={() => onOpenAdmitPatient()}
-                            className="flex items-center px-3 py-1.5 bg-zinc-800 text-zinc-200 rounded-lg hover:bg-zinc-700 transition-colors text-sm border border-zinc-600"
+                            className="flex items-center px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors text-sm border border-zinc-600"
                           >
                             <UserPlus className="w-4 h-4 mr-1" /> Bemor qabul qilish
                           </button>
                         )}
-                        <button type="button" onClick={openAddDeviceFromScreen} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
+                        <button type="button" onClick={openAddDeviceFromScreen} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-800 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
                           <Plus className="w-4 h-4 mr-1" /> Qurilma qo'shish
                         </button>
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-zinc-700/50 bg-zinc-900/40 p-3 text-xs text-zinc-400">
-                      <p className="font-medium text-zinc-300 mb-1">K12 (Creative Medical) — qurilma sozlash</p>
+                    <div className="rounded-lg border border-zinc-200 bg-amber-50/80 p-3 text-xs text-zinc-800">
+                      <p className="font-medium text-zinc-800 mb-1">K12 (Creative Medical) — qurilma sozlash</p>
                       <p className="leading-relaxed">
-                        Asosiy: <span className="text-zinc-300">«Меню»</span> →{' '}
-                        <span className="text-zinc-300">«Параметры системы»</span> → varaq{' '}
-                        <span className="text-zinc-300">«Интернет»</span> → <span className="text-zinc-300">HL7</span>{' '}
-                        (VPS IP, port <span className="text-zinc-300">6006</span>). «ORU» alohida punkt bo‘lmasligi
+                        Asosiy: <span className="text-zinc-800">«Меню»</span> →{' '}
+                        <span className="text-zinc-800">«Параметры системы»</span> → varaq{' '}
+                        <span className="text-zinc-800">«Интернет»</span> → <span className="text-zinc-800">HL7</span>{' '}
+                        (VPS IP, port <span className="text-zinc-800">6006</span>). «ORU» alohida punkt bo‘lmasligi
                         mumkin — ko‘p K12 larda HL7 ulanishi yoqilgach vitallar avtomatik yuboriladi (HL7 standartida
                         bu ORU^R01). Tekshiruv: HL7 ekranida ulanish yashil / «Тест» muvaffaqiyati; asosiy ekranda HR,
                         SpO2 raqamlari «—» emas. Qidiriladigan boshqa nomlar: «передача», «обмен», «сетевой поток»,
-                        «наблюдения». <span className="text-zinc-300">AI-ECG</span> — alohida port; MediCentral uchun
+                        «наблюдения». <span className="text-zinc-800">AI-ECG</span> — alohida port; MediCentral uchun
                         shart emas.
                       </p>
                     </div>
@@ -578,17 +578,17 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                     {data.geminiConfigured !== true && (
                       <div
                         role="status"
-                        className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100"
+                        className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
                       >
-                        <div className="font-bold text-amber-200 mb-1">GEMINI_API_KEY (rasm tahlili)</div>
-                        <p className="text-zinc-300 mb-2">
+                        <div className="font-bold text-amber-900 mb-1">GEMINI_API_KEY (rasm tahlili)</div>
+                        <p className="text-zinc-800 mb-2">
                           «Qurilma qo&apos;shish» (ekran rasmi) uchun serverda{' '}
-                          <code className="text-emerald-400">GEMINI_API_KEY</code> bo&apos;lishi kerak — Google AI
+                          <code className="text-emerald-800 font-mono">GEMINI_API_KEY</code> bo&apos;lishi kerak — Google AI
                           Studio kaliti.
                         </p>
-                        <p className="text-zinc-400 text-xs font-mono">
+                        <p className="text-zinc-600 text-xs font-mono">
                           Masofadan:{' '}
-                          <span className="text-zinc-200">
+                          <span className="text-zinc-900">
                             set DEPLOY_GEMINI_KEY=&lt;kalit&gt; &amp;&amp; set SSH_PASSWORD=... &amp;&amp; python
                             deploy/deploy_remote.py update
                           </span>
@@ -609,8 +609,8 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                           connectionCheck.checkTone === 'success'
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
                             : connectionCheck.checkTone === 'warning'
-                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-100'
-                              : 'bg-sky-500/10 border-sky-500/25 text-sky-100'
+                              ? 'bg-amber-50 border-amber-200 text-amber-950'
+                              : 'bg-sky-50 border-sky-200 text-sky-950'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -623,14 +623,14 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   ? 'Diqqat'
                                   : "Ma'lumot"}
                             </div>
-                            <p className="text-zinc-300 mb-2">{connectionCheck.summary}</p>
-                            <ul className="list-disc list-inside space-y-1 text-zinc-400">
+                            <p className="text-zinc-800 mb-2">{connectionCheck.summary}</p>
+                            <ul className="list-disc list-inside space-y-1 text-zinc-600">
                               <li>
                                 Ma'lumot oqimi:{' '}
                                 {connectionCheck.isReceivingData ? (
-                                  <span className="text-emerald-400">chegara ichida</span>
+                                  <span className="text-emerald-800">chegara ichida</span>
                                 ) : (
-                                  <span className="text-amber-400">yo'q yoki kechikkan</span>
+                                  <span className="text-amber-800">yo'q yoki kechikkan</span>
                                 )}
                                 {connectionCheck.secondsSinceLastMessage != null && (
                                   <span className="ml-1 font-mono">
@@ -641,25 +641,25 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                               <li>
                                 Joy:{' '}
                                 {connectionCheck.assignment.bedAssigned ? (
-                                  <span className="text-emerald-400">biriktirilgan</span>
+                                  <span className="text-emerald-800">biriktirilgan</span>
                                 ) : (
-                                  <span className="text-amber-400">yo'q</span>
+                                  <span className="text-amber-800">yo'q</span>
                                 )}
                                 {' · '}
                                 Bemor:{' '}
                                 {connectionCheck.assignment.patientOnBed ? (
-                                  <span className="text-emerald-400">bor</span>
+                                  <span className="text-emerald-800">bor</span>
                                 ) : (
-                                  <span className="text-amber-400">yo'q</span>
+                                  <span className="text-amber-800">yo'q</span>
                                 )}
                               </li>
                               <li>
                                 HL7 port (server):{' '}
                                 {String(connectionCheck.hl7.listenPort ?? '—')} —{' '}
                                 {connectionCheck.hl7.localPortAcceptsConnections ? (
-                                  <span className="text-emerald-400">tinglanmoqda</span>
+                                  <span className="text-emerald-800">tinglanmoqda</span>
                                 ) : (
-                                  <span className="text-amber-400">ochiq emas</span>
+                                  <span className="text-amber-800">ochiq emas</span>
                                 )}
                                 {connectionCheck.hl7.bindError ? (
                                   <span className="block text-red-400 mt-1 text-xs">
@@ -684,7 +684,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                               {connectionCheck.hl7Diagnostic.lastEmptySessionTcpBytes != null && (
                                 <li className="text-zinc-500 text-xs mt-1">
                                   Oxirgi bo&apos;sh HL7 sessiya: TCP qabul{' '}
-                                  <span className="font-mono text-zinc-400">
+                                  <span className="font-mono text-zinc-600">
                                     {String(connectionCheck.hl7Diagnostic.lastEmptySessionTcpBytes)}
                                   </span>{' '}
                                   bayt — peer{' '}
@@ -698,7 +698,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                               )}
                               {typeof connectionCheck.hl7Diagnostic.lastTcpRawBytesHex === 'string' &&
                                 connectionCheck.hl7Diagnostic.lastTcpRawBytesHex.length > 0 && (
-                                  <li className="text-amber-200/85 text-xs mt-1 break-all">
+                                  <li className="text-amber-900 text-xs mt-1 break-all">
                                     MSH yo‘q, lekin TCP bayt kelgan (hex qisqa):{' '}
                                     {String(connectionCheck.hl7Diagnostic.lastTcpRawBytesHex).slice(0, 64)}
                                     … — server .env: <span className="font-mono">HL7_LOG_RAW_TCP_RECV=true</span>
@@ -706,8 +706,8 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                 )}
                             </ul>
                             {connectionCheck.firewallHints.length > 0 && (
-                              <p className="mt-2 text-xs text-zinc-500 border-t border-zinc-700/50 pt-2">
-                                <span className="font-semibold text-zinc-400">Firewall:</span>{' '}
+                              <p className="mt-2 text-xs text-zinc-500 border-t border-zinc-200/50 pt-2">
+                                <span className="font-semibold text-zinc-600">Firewall:</span>{' '}
                                 {connectionCheck.firewallHints.join(' ')}
                               </p>
                             )}
@@ -719,7 +719,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                               </ul>
                             )}
                             {connectionCheck.warnings.length > 0 && (
-                              <ul className="mt-3 list-disc list-inside text-amber-200/90 space-y-1">
+                              <ul className="mt-3 list-disc list-inside text-amber-900 space-y-1">
                                 {connectionCheck.warnings.map((w, i) => (
                                   <li key={`${i}-${w.slice(0, 24)}`}>{w}</li>
                                 ))}
@@ -739,8 +739,8 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                     )}
 
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left text-zinc-400">
-                        <thead className="text-xs text-zinc-500 uppercase bg-zinc-900/50 border-b border-zinc-800">
+                      <table className="w-full text-sm text-left text-zinc-600">
+                        <thead className="text-xs text-zinc-600 uppercase font-semibold bg-zinc-100 border-b border-zinc-200">
                           <tr>
                             <th className="px-4 py-3">ID / Model</th>
                             <th className="px-4 py-3">Tarmoq / HL7</th>
@@ -751,9 +751,9 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                         </thead>
                         <tbody>
                           {data.devices.map((device: any) => (
-                            <tr key={device.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/30">
+                            <tr key={device.id} className="border-b border-zinc-200/50 hover:bg-zinc-50">
                               <td className="px-4 py-3">
-                                <div className="font-medium text-zinc-200">{device.model}</div>
+                                <div className="font-medium text-zinc-900">{device.model}</div>
                                 <div className="text-xs font-mono text-zinc-500">{device.id}</div>
                               </td>
                               <td className="px-4 py-3 font-mono text-xs">
@@ -767,7 +767,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   <label className="block mt-2 text-[10px] text-zinc-500 leading-tight">
                                     HL7 salom (handshake)
                                     <select
-                                      className="mt-0.5 w-full max-w-[12rem] bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-zinc-300 text-[10px]"
+                                      className="mt-0.5 w-full max-w-[12rem] bg-white border border-zinc-200 shadow-xl rounded px-1 py-0.5 text-zinc-800 text-[10px]"
                                       value={
                                         device.hl7ConnectHandshake === null ||
                                         device.hl7ConnectHandshake === undefined
@@ -826,7 +826,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   type="button"
                                   onClick={() => void markDeviceOnlineTest(device.id)}
                                   disabled={markingOnlineId === device.id}
-                                  className="p-1.5 text-zinc-400 hover:text-emerald-400 bg-zinc-800 rounded-md disabled:opacity-50"
+                                  className="p-1.5 text-zinc-600 hover:text-emerald-800 bg-zinc-100 rounded-md disabled:opacity-50"
                                   title="Sinov: onlayn belgilash (HL7 tarmog'i hali ulanmagan bo'lsa)"
                                 >
                                   <Wifi className={`w-4 h-4 ${markingOnlineId === device.id ? 'animate-pulse' : ''}`} aria-hidden />
@@ -835,13 +835,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                                   type="button"
                                   onClick={() => void checkDeviceConnection(device.id)}
                                   disabled={checkingDeviceId === device.id}
-                                  className="p-1.5 text-zinc-400 hover:text-cyan-400 bg-zinc-800 rounded-md disabled:opacity-50"
+                                  className="p-1.5 text-zinc-600 hover:text-cyan-400 bg-zinc-100 rounded-md disabled:opacity-50"
                                   title="Ulanish va ma'lumot oqimini tekshirish"
                                 >
                                   <Radio className={`w-4 h-4 ${checkingDeviceId === device.id ? 'animate-pulse' : ''}`} aria-hidden />
                                 </button>
-                                <button onClick={() => assignBedToDevice(device.id)} className="p-1.5 text-zinc-400 hover:text-blue-400 bg-zinc-800 rounded-md" title="Joyga biriktirish"><Edit2 className="w-4 h-4" /></button>
-                                <button onClick={() => deleteDevice(device.id)} className="p-1.5 text-zinc-400 hover:text-red-400 bg-zinc-800 rounded-md"><Trash2 className="w-4 h-4" /></button>
+                                <button onClick={() => assignBedToDevice(device.id)} className="p-1.5 text-zinc-600 hover:text-blue-400 bg-zinc-100 rounded-md" title="Joyga biriktirish"><Edit2 className="w-4 h-4" /></button>
+                                <button onClick={() => deleteDevice(device.id)} className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"><Trash2 className="w-4 h-4" /></button>
                               </td>
                             </tr>
                           ))}
@@ -876,7 +876,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                             useStore.getState().setAllSchedules(60000);
                             closeDialogs();
                           }}
-                          className="px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors text-sm border border-emerald-500/20"
+                          className="px-4 py-2 bg-emerald-500/10 text-emerald-800 rounded-lg hover:bg-emerald-500/20 transition-colors text-sm border border-emerald-500/20"
                         >
                           Barchasiga 1 daqiqalik tekshiruv
                         </button>
@@ -885,10 +885,10 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
 
                     <div className="grid grid-cols-1 gap-4">
                       {Object.values(patients).map((patient: any) => (
-                        <div key={patient.id} className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+                        <div key={patient.id} className="flex items-center justify-between p-4 bg-zinc-50 border border-zinc-200 rounded-xl">
                           <div>
-                            <h4 className="font-bold text-zinc-200">{patient.name} <span className="text-xs font-mono text-zinc-500 ml-2">({patient.id})</span></h4>
-                            <p className="text-sm text-zinc-400">{patient.room} • {patient.diagnosis}</p>
+                            <h4 className="font-bold text-zinc-900">{patient.name} <span className="text-xs font-mono text-zinc-500 ml-2">({patient.id})</span></h4>
+                            <p className="text-sm text-zinc-600">{patient.room} • {patient.diagnosis}</p>
                           </div>
                           <button 
                             onClick={() => {
@@ -914,30 +914,30 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
 
                 {/* Integration Tab */}
                 {activeTab === 'integration' && (
-                  <div className="space-y-6 text-zinc-300">
+                  <div className="space-y-6 text-zinc-800">
                     <h3 className="text-lg font-medium text-white">Qurilmalarni Tizimga Ulash (Integratsiya)</h3>
                     
                     <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                       <h4 className="font-bold text-blue-400 mb-2">HL7 (port 6006) va server</h4>
                       <p className="text-sm leading-relaxed">
                         Qurilma ekranida <strong>Server IP</strong> va <strong>port</strong> (odatda 6006) ko‘rsatiladi — bu manzilga HL7 MLLP orqali ulanadi.
-                        ClinicMonitoring backend <code className="text-emerald-400">0.0.0.0:6006</code> da tinglaydi (muhit: <code className="text-emerald-400">HL7_LISTEN_PORT</code>).
+                        ClinicMonitoring backend <code className="text-emerald-800">0.0.0.0:6006</code> da tinglaydi (muhit: <code className="text-emerald-800">HL7_LISTEN_PORT</code>).
                         Firewallda 6006-portni oching. Qurilma ro‘yxatida <strong>qurilma lokal IP</strong>si saqlanadi; TCP ulanish shu manzil bo‘yicha taniladi.
                       </p>
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold text-zinc-200">1-qadam: Tarmoqqa ulash</h4>
-                      <p className="text-sm text-zinc-400">Monitorni tarmoqqa ulang va unga statik IP manzil bering (Masalan: <code>192.168.1.105</code>). Bu IP manzilni "Qurilmalar" bo'limidan tizimga kiriting.</p>
+                      <h4 className="font-bold text-zinc-900">1-qadam: Tarmoqqa ulash</h4>
+                      <p className="text-sm text-zinc-600">Monitorni tarmoqqa ulang va unga statik IP manzil bering (Masalan: <code>192.168.1.105</code>). Bu IP manzilni "Qurilmalar" bo'limidan tizimga kiriting.</p>
 
-                      <h4 className="font-bold text-zinc-200">2-qadam: Ma'lumotlarni yuborish (API)</h4>
-                      <p className="text-sm text-zinc-400">Agar qurilma yoki oraliq server (Gateway) REST API orqali ma'lumot yuborsa, quyidagi manzilga POST so'rov yuborishi kerak:</p>
+                      <h4 className="font-bold text-zinc-900">2-qadam: Ma'lumotlarni yuborish (API)</h4>
+                      <p className="text-sm text-zinc-600">Agar qurilma yoki oraliq server (Gateway) REST API orqali ma'lumot yuborsa, quyidagi manzilga POST so'rov yuborishi kerak:</p>
                       
-                      <div className="bg-black p-4 rounded-lg border border-zinc-800 font-mono text-sm">
-                        <div className="text-emerald-400 mb-2">POST /api/device/[IP_MANZIL]/vitals</div>
+                      <div className="bg-zinc-100 p-4 rounded-lg border border-zinc-200 font-mono text-sm text-zinc-900">
+                        <div className="text-emerald-800 mb-2 font-semibold">POST /api/device/[IP_MANZIL]/vitals</div>
                         <div className="text-zinc-500">Content-Type: application/json</div>
                         <br/>
-                        <div className="text-zinc-300">
+                        <div className="text-zinc-800">
                           {`{
   "hr": 75,
   "spo2": 98,
@@ -950,8 +950,8 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                         </div>
                       </div>
 
-                      <h4 className="font-bold text-zinc-200">3-qadam: Bemorga biriktirish</h4>
-                      <p className="text-sm text-zinc-400">
+                      <h4 className="font-bold text-zinc-900">3-qadam: Bemorga biriktirish</h4>
+                      <p className="text-sm text-zinc-600">
                         Qurilma tizimga qo'shilgandan so'ng, uni ma'lum bir "Joy"ga (Bed) biriktirasiz. 
                         Bemor shu joyga yotqizilganda, tizim avtomatik ravishda qurilmadan kelayotgan ma'lumotlarni bemor profiliga bog'laydi.
                       </p>

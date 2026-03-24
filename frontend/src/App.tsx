@@ -19,7 +19,7 @@ export default function App() {
 
   if (!checked) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500">
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center text-zinc-700 font-medium">
         Yuklanmoqda…
       </div>
     );

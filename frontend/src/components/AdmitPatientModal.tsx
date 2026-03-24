@@ -103,7 +103,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/35 backdrop-blur-sm p-4"
       role="presentation"
       onClick={onClose}
     >
@@ -111,22 +111,22 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="admit-patient-title"
-        className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        className="bg-white border border-zinc-200 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-zinc-800 bg-zinc-900/90">
+        <div className="flex items-center justify-between p-5 border-b border-zinc-200 bg-zinc-50">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
               <UserPlus className="w-5 h-5" aria-hidden />
             </div>
-            <h2 id="admit-patient-title" className="text-xl font-bold text-zinc-100">
+            <h2 id="admit-patient-title" className="text-xl font-bold text-zinc-900">
               Bemor qabul qilish
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"
+            className="p-2 text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
             aria-label="Yopish"
           >
             <X className="w-5 h-5" />
@@ -135,13 +135,13 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm font-medium">
               {error}
             </div>
           )}
           {!error && !isLoading && !hasBedOptions && (
             <div
-              className="bg-amber-500/10 border border-amber-500/20 text-amber-200 p-3 rounded-lg text-sm"
+              className="bg-amber-50 border border-amber-200 text-amber-950 p-3 rounded-lg text-sm font-medium"
               role="status"
             >
               Tizimda bo&apos;sh joy (palata/karavat) topilmadi. Avval sozlamalar orqali infratuzilma
@@ -150,7 +150,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
           )}
 
           <div>
-            <label htmlFor="adm-dept" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="adm-dept" className="block text-sm font-semibold text-zinc-700 mb-1">
               Bo&apos;lim
             </label>
             <select
@@ -162,7 +162,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
                 setBedId('');
               }}
               disabled={isLoading || !!error || !hasBedOptions}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all disabled:opacity-50"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all disabled:opacity-50"
               required
             >
               <option value="">{isLoading ? 'Yuklanmoqda...' : 'Bo‘limni tanlang'}</option>
@@ -175,7 +175,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="adm-room" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="adm-room" className="block text-sm font-semibold text-zinc-700 mb-1">
               Palata / xona
             </label>
             <select
@@ -186,7 +186,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
                 setBedId('');
               }}
               disabled={isLoading || !!error || !departmentId}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all disabled:opacity-50"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all disabled:opacity-50"
               required
             >
               <option value="">Tanlang</option>
@@ -199,7 +199,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="adm-bed" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="adm-bed" className="block text-sm font-semibold text-zinc-700 mb-1">
               Karavat / joy
             </label>
             <select
@@ -207,7 +207,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
               value={bedId}
               onChange={(e) => setBedId(e.target.value)}
               disabled={isLoading || !!error || !roomId}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all disabled:opacity-50"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all disabled:opacity-50"
               required
             >
               <option value="">Tanlang</option>
@@ -225,7 +225,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="name" className="block text-sm font-semibold text-zinc-700 mb-1">
               F.I.Sh.
             </label>
             <input
@@ -235,13 +235,13 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
               required
               value={formData.name}
               onChange={handleChange}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               placeholder="Masalan: Karimov A.B."
             />
           </div>
 
           <div>
-            <label htmlFor="diagnosis" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="diagnosis" className="block text-sm font-semibold text-zinc-700 mb-1">
               Tashxis
             </label>
             <input
@@ -251,13 +251,13 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
               required
               value={formData.diagnosis}
               onChange={handleChange}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               placeholder="Asosiy tashxis"
             />
           </div>
 
           <div>
-            <label htmlFor="doctor" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="doctor" className="block text-sm font-semibold text-zinc-700 mb-1">
               Mas&apos;ul shifokor
             </label>
             <input
@@ -267,13 +267,13 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
               required
               value={formData.doctor}
               onChange={handleChange}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               placeholder="Shifokor F.I.Sh."
             />
           </div>
 
           <div>
-            <label htmlFor="assignedNurse" className="block text-sm font-medium text-zinc-400 mb-1">
+            <label htmlFor="assignedNurse" className="block text-sm font-semibold text-zinc-700 mb-1">
               Mas&apos;ul hamshira
             </label>
             <input
@@ -283,7 +283,7 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
               required
               value={formData.assignedNurse}
               onChange={handleChange}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+              className="w-full bg-white border border-zinc-300 rounded-lg px-4 py-2.5 text-zinc-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               placeholder="Hamshira F.I.Sh."
             />
           </div>
@@ -292,14 +292,14 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-lg text-sm font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 transition-colors"
             >
               Bekor qilish
             </button>
             <button
               type="submit"
               disabled={!hasBedOptions || isLoading || !!error || !bedId}
-              className="px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-emerald-900/20"
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
             >
               Qabul qilish
             </button>

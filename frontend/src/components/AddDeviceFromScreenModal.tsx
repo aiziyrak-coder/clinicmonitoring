@@ -106,7 +106,7 @@ export function AddDeviceFromScreenModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-zinc-900/35 backdrop-blur-sm p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -115,20 +115,20 @@ export function AddDeviceFromScreenModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-device-screen-title"
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white border border-zinc-200 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-          <div className="flex items-center gap-2 text-emerald-400">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 bg-zinc-50/80">
+          <div className="flex items-center gap-2 text-emerald-700">
             <Building2 className="w-5 h-5" />
-            <h2 id="add-device-screen-title" className="text-lg font-bold text-white">
+            <h2 id="add-device-screen-title" className="text-lg font-bold text-zinc-900">
               Qurilma (ekran rasmi)
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-zinc-400 hover:text-white rounded-lg"
+            className="p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
             aria-label="Yopish"
           >
             <X className="w-5 h-5" />
@@ -136,19 +136,19 @@ export function AddDeviceFromScreenModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <p className="text-sm text-zinc-400">
-            Avval joyni tanlang, keyin monitorning <strong className="text-zinc-300">Интернет / HL7</strong>{' '}
+          <p className="text-sm text-zinc-700 font-medium">
+            Avval joyni tanlang, keyin monitorning <strong className="text-zinc-900">Интернет / HL7</strong>{' '}
             oynasining skrinshotini yuklang — tizim IP, MAC va portlarni o‘qiydi.
           </p>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm p-3 rounded-lg">
+            <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-medium p-3 rounded-lg">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Bo‘lim</label>
+            <label className="block text-sm text-zinc-700 font-medium mb-1">Bo‘lim</label>
             <select
               value={departmentId}
               onChange={(e) => {
@@ -156,7 +156,7 @@ export function AddDeviceFromScreenModal({
                 setRoomId('');
                 setBedId('');
               }}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white"
+              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium"
               required
             >
               <option value="">Tanlang…</option>
@@ -169,7 +169,7 @@ export function AddDeviceFromScreenModal({
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Palata / xona</label>
+            <label className="block text-sm text-zinc-700 font-medium mb-1">Palata / xona</label>
             <select
               value={roomId}
               onChange={(e) => {
@@ -177,7 +177,7 @@ export function AddDeviceFromScreenModal({
                 setBedId('');
               }}
               disabled={!departmentId}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white disabled:opacity-50"
+              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium disabled:opacity-50"
               required
             >
               <option value="">Tanlang…</option>
@@ -190,12 +190,12 @@ export function AddDeviceFromScreenModal({
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Karavat / joy</label>
+            <label className="block text-sm text-zinc-700 font-medium mb-1">Karavat / joy</label>
             <select
               value={bedId}
               onChange={(e) => setBedId(e.target.value)}
               disabled={!roomId}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white disabled:opacity-50"
+              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium disabled:opacity-50"
               required
             >
               <option value="">Tanlang…</option>
@@ -207,7 +207,7 @@ export function AddDeviceFromScreenModal({
             </select>
           </div>
 
-          <div className="border border-dashed border-zinc-600 rounded-lg p-4 text-center">
+          <div className="border border-dashed border-zinc-300 bg-zinc-50 rounded-lg p-4 text-center">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -217,24 +217,24 @@ export function AddDeviceFromScreenModal({
             />
             <label
               htmlFor="monitor-screen-file"
-              className="cursor-pointer flex flex-col items-center gap-2 text-zinc-400 hover:text-emerald-400"
+              className="cursor-pointer flex flex-col items-center gap-2 text-zinc-600 hover:text-emerald-700 font-medium"
             >
               <Upload className="w-8 h-8" />
               <span>Rasm tanlash (JPEG / PNG)</span>
-              {file && <span className="text-xs font-mono text-zinc-500">{file.name}</span>}
+              {file && <span className="text-xs font-mono text-zinc-600">{file.name}</span>}
             </label>
             {previewUrl && (
               <img
                 src={previewUrl}
                 alt="Yuklangan ekran"
-                className="mt-3 max-h-48 mx-auto rounded border border-zinc-700"
+                className="mt-3 max-h-48 mx-auto rounded border border-zinc-200"
               />
             )}
           </div>
 
-          <p className="text-xs text-zinc-500 flex items-start gap-1">
+          <p className="text-xs text-zinc-600 flex items-start gap-1 font-medium">
             <ChevronRight className="w-4 h-4 shrink-0 mt-0.5" />
-            Backend-da <code className="text-zinc-400">GEMINI_API_KEY</code> bo‘lishi kerak (Google AI
+            Backend-da <code className="text-zinc-900 bg-zinc-100 px-1 rounded font-mono text-[11px]">GEMINI_API_KEY</code> bo‘lishi kerak (Google AI
             Studio).
           </p>
 
@@ -242,7 +242,7 @@ export function AddDeviceFromScreenModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-zinc-400 hover:text-white"
+              className="px-4 py-2 text-zinc-600 hover:text-zinc-900 font-semibold"
             >
               Bekor
             </button>

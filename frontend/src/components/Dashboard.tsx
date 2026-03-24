@@ -23,8 +23,8 @@ const Clock = memo(() => {
 
   return (
     <div className="flex flex-col items-end justify-center">
-      <span className="text-sm font-bold text-zinc-200">{format(currentTime, 'HH:mm:ss')}</span>
-      <span className="text-xs font-mono">{format(currentTime, 'dd MMM yyyy')}</span>
+      <span className="text-sm font-bold text-zinc-900 tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
+      <span className="text-xs font-mono text-zinc-600">{format(currentTime, 'dd MMM yyyy')}</span>
     </div>
   );
 });
@@ -106,7 +106,7 @@ export function Dashboard() {
   const stablePatients = useMemo(() => filteredPatients.filter(p => p.alarm.level === 'none'), [filteredPatients]);
 
   return (
-    <div className="min-h-screen text-zinc-300 font-sans selection:bg-emerald-500/30 relative">
+    <div className="min-h-screen text-zinc-800 font-sans font-medium selection:bg-emerald-500/20 relative">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -124,7 +124,7 @@ export function Dashboard() {
           fetchPriority="high"
         />
         <div
-          className="absolute inset-0 bg-black/30 backdrop-blur-[8px] sm:backdrop-blur-[14px] pointer-events-none"
+          className="absolute inset-0 bg-white/55 backdrop-blur-[6px] sm:backdrop-blur-[14px] pointer-events-none"
           aria-hidden
         />
       </div>
@@ -132,24 +132,24 @@ export function Dashboard() {
       {/* Content Wrapper */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Top Navigation Bar */}
-        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 sm:px-6 py-4 bg-zinc-950/80 border-b border-zinc-800/50 backdrop-blur-md">
+        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 sm:px-6 py-4 bg-white/95 border-b border-zinc-200 shadow-sm backdrop-blur-md">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden border border-emerald-500/20 bg-zinc-900/80 shrink-0">
+            <div className="flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden border border-emerald-200 bg-zinc-50 shrink-0 shadow-sm">
               <img src="/logo-fjsti.png" alt="" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-zinc-100 tracking-tight">ClinicMonitoring</h1>
+              <h1 className="text-xl font-bold text-zinc-900 tracking-tight">ClinicMonitoring</h1>
               <div className="flex items-center space-x-2 flex-wrap">
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider max-w-[14rem] sm:max-w-none truncate">
+                <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider max-w-[14rem] sm:max-w-none truncate font-semibold">
                   {clinicName ?? 'Klinika'}
                 </p>
                 {username ? (
-                  <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline">· {username}</span>
+                  <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">· {username}</span>
                 ) : null}
                 <div
                   role="status"
                   aria-live="polite"
-                  className={`flex items-center text-[10px] px-1.5 py-0.5 rounded-full border ${wsConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}
+                  className={`flex items-center text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${wsConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
                 >
                   {wsConnected ? <Wifi className="w-3 h-3 mr-1" aria-hidden /> : <WifiOff className="w-3 h-3 mr-1" aria-hidden />}
                   {wsConnected ? 'Online' : 'Offline'}
@@ -171,25 +171,25 @@ export function Dashboard() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Bemor bo'yicha qidiruv"
-              className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full sm:w-48 pl-10 p-2 outline-none transition-all sm:focus:w-64"
+              className="bg-white border border-zinc-300 text-zinc-900 text-sm font-medium rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 block w-full sm:w-48 pl-10 p-2 outline-none transition-all sm:focus:w-64 shadow-sm"
             />
           </div>
 
-          <div className="h-6 w-px bg-zinc-800" />
+          <div className="h-6 w-px bg-zinc-200" />
 
           {/* Status Indicators */}
           <div className="flex flex-wrap gap-2">
             <button 
               type="button"
               onClick={() => setFilter('all')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'all' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}`}
             >
               Barchasi ({patientList.length})
             </button>
             <button 
               type="button"
               onClick={() => setFilter('critical')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center ${filter === 'critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-zinc-400 hover:text-red-400'}`}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'critical' ? 'bg-red-50 text-red-800 border border-red-200' : 'text-zinc-600 hover:text-red-700'}`}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" aria-hidden />
               Kritik ({criticalCount})
@@ -197,7 +197,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={() => setFilter('warning')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center ${filter === 'warning' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-yellow-400'}`}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'warning' ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'text-zinc-600 hover:text-amber-800'}`}
             >
               <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" aria-hidden />
               Ogohlantirish ({warningCount})
@@ -205,30 +205,30 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={() => setFilter('pinned')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center ${filter === 'pinned' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-zinc-400 hover:text-emerald-400'}`}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'pinned' ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:text-emerald-800'}`}
             >
               <Pin className="w-3 h-3 mr-2" aria-hidden />
               Qadalgan ({pinnedCount})
             </button>
           </div>
 
-          <div className="h-6 w-px bg-zinc-800" />
+          <div className="h-6 w-px bg-zinc-200" />
 
           {/* Department Filter */}
           <select 
             value={departmentFilter} 
             onChange={(e) => setDepartmentFilter(e.target.value as DepartmentFilter)}
             aria-label="Bo'lim bo'yicha filtrlash"
-            className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 outline-none min-w-[10rem]"
+            className="bg-white border border-zinc-300 text-zinc-900 text-sm font-medium rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 block p-2 outline-none min-w-[10rem] shadow-sm"
           >
             <option value="all">Barcha bo'limlar</option>
             <option value="reanimatsiya">Reanimatsiya</option>
             <option value="palata">Umumiy palatalar</option>
           </select>
 
-          <div className="h-6 w-px bg-zinc-800" />
+          <div className="h-6 w-px bg-zinc-200" />
 
-          <div className="flex items-center space-x-4 text-zinc-400">
+          <div className="flex items-center space-x-4 text-zinc-700">
             <div className="flex items-center mr-2">
               <span className={`w-2 h-2 rounded-full mr-2 ${wsConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
               <span className="text-xs font-mono">{wsConnected ? 'ONLAYN' : 'OFLAYN'}</span>
@@ -238,7 +238,7 @@ export function Dashboard() {
             <button
               type="button"
               onClick={() => setIsAiModalOpen(true)}
-              className="px-3 py-1.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center text-sm font-medium"
+              className="px-3 py-1.5 rounded-full bg-red-50 text-red-800 border border-red-200 hover:bg-red-100 transition-colors flex items-center text-sm font-semibold"
               title="O'lim holati aniqlandi"
             >
               <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" aria-hidden />
@@ -248,7 +248,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={() => setIsAdmitModalOpen(true)}
-              className="p-2 rounded-full hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors" 
+              className="p-2 rounded-full hover:bg-emerald-50 hover:text-emerald-800 transition-colors" 
               title="Yangi bemor qabul qilish"
               aria-label="Yangi bemor qabul qilish"
             >
@@ -257,7 +257,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={toggleAudioMute} 
-              className="p-2 rounded-full hover:bg-zinc-800 transition-colors" 
+              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
               title={isAudioMuted ? "Ovozni yoqish" : "Ovozni o'chirish"}
               aria-label={isAudioMuted ? "Signal ovozini yoqish" : "Signal ovozini o'chirish"}
             >
@@ -266,7 +266,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={togglePrivacyMode} 
-              className="p-2 rounded-full hover:bg-zinc-800 transition-colors" 
+              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
               title="Maxfiylik rejimi"
               aria-label={privacyMode ? "Maxfiylik rejimini o'chirish" : "Maxfiylik rejimini yoqish"}
               aria-pressed={privacyMode}
@@ -276,7 +276,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={() => setIsColorGuideOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-800/90 border border-zinc-700 text-zinc-200 hover:border-emerald-500/40 hover:bg-zinc-800 hover:text-emerald-300 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-zinc-100 border border-zinc-200 text-zinc-800 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900 transition-colors"
               title="Ranglar bo'yicha yo'riqnoma"
               aria-label="Ranglar bo'yicha to'liq yo'riqnoma"
             >
@@ -286,7 +286,7 @@ export function Dashboard() {
             <button 
               type="button"
               onClick={() => setIsSettingsModalOpen(true)}
-              className="p-2 rounded-full hover:bg-zinc-800 transition-colors" 
+              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
               title="Sozlamalar"
               aria-label="Sozlamalar"
             >
@@ -308,7 +308,7 @@ export function Dashboard() {
       {/* Main Content Grid */}
       <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 flex-1 outline-none">
         {patientList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 px-4">
+          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600 px-4">
             {!wsConnected ? (
               <>
                 <Activity className="w-12 h-12 mb-4 animate-pulse opacity-50" />
@@ -318,8 +318,8 @@ export function Dashboard() {
             ) : (
               <>
                 <Users className="w-12 h-12 mb-4 opacity-40" />
-                <p className="text-lg font-medium text-zinc-300">Hozircha bemor yo&apos;q</p>
-                <p className="text-sm mt-2 text-center max-w-md">Bemor qabul qilish tugmasi orqali karavatni tanlang va bemorni ro&apos;yxatga qo&apos;shing.</p>
+                <p className="text-lg font-semibold text-zinc-900">Hozircha bemor yo&apos;q</p>
+                <p className="text-sm mt-2 text-center max-w-md text-zinc-700">Bemor qabul qilish tugmasi orqali karavatni tanlang va bemorni ro&apos;yxatga qo&apos;shing.</p>
                 <button
                   type="button"
                   onClick={() => setIsAdmitModalOpen(true)}
@@ -332,16 +332,16 @@ export function Dashboard() {
             )}
           </div>
         ) : filteredPatients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500">
+          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600">
             <Users className="w-12 h-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">Joriy filtrga mos bemorlar topilmadi.</p>
+            <p className="text-lg font-semibold text-zinc-900">Joriy filtrga mos bemorlar topilmadi.</p>
           </div>
         ) : (
           <div className="space-y-8">
             {/* Critical (Red) */}
             {criticalPatients.length > 0 && (
               <div>
-                <h2 className="text-red-500 font-bold mb-4 flex items-center">
+                <h2 className="text-red-700 font-bold mb-4 flex items-center">
                   <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />
                   Kritik Holat
                 </h2>
@@ -356,7 +356,7 @@ export function Dashboard() {
             {/* Warning (Yellow, Blue, Purple) */}
             {warningPatients.length > 0 && (
               <div>
-                <h2 className="text-yellow-500 font-bold mb-4 flex items-center">
+                <h2 className="text-amber-800 font-bold mb-4 flex items-center">
                   <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
                   Ogohlantirish
                 </h2>
@@ -371,7 +371,7 @@ export function Dashboard() {
             {/* Stable (None) */}
             {stablePatients.length > 0 && (
               <div>
-                <h2 className="text-emerald-500 font-bold mb-4 flex items-center">
+                <h2 className="text-emerald-800 font-bold mb-4 flex items-center">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
                   Stabil Holat
                 </h2>
@@ -387,21 +387,21 @@ export function Dashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto py-3 px-6 border-t border-zinc-800/50 bg-zinc-950/80 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 z-40 shrink-0">
+      <footer className="mt-auto py-3 px-6 border-t border-zinc-200 bg-white/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-600 font-medium z-40 shrink-0">
         <div className="flex items-center space-x-1">
           <span>&copy; 2026 ClinicMonitoring. Farg&apos;ona Jamoat Salomatligi Tibbiyot Instituti</span>
         </div>
         <div className="flex items-center space-x-4 mt-2 sm:mt-0">
           <span className="flex items-center">
             Ishlab chiqaruvchi: 
-            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-zinc-400 hover:text-emerald-400 transition-colors">
+            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-emerald-700 transition-colors">
               CDCGroup
             </a>
           </span>
-          <span className="w-1 h-1 rounded-full bg-zinc-700"></span>
+          <span className="w-1 h-1 rounded-full bg-zinc-300"></span>
           <span className="flex items-center">
             Qo'llab-quvvatlovchi: 
-            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-zinc-400 hover:text-purple-400 transition-colors">
+            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-purple-700 transition-colors">
               CraDev Company
             </a>
           </span>
