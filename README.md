@@ -100,7 +100,17 @@ Qurilma ro‘yxatida **qurilma IP** (TCP ulanish manba IP) saqlanadi — HL7 xab
 
 ## CI
 
-GitHub Actions: `frontend` (npm ci, lint, build), `backend` (pip, check, migrate, health smoke), `docker-backend` (image build). Registry push va klaster deploy — o‘zingizning `secrets` bilan qo‘shiladi.
+GitHub Actions: `frontend` (npm ci, lint, build), `backend` (pip, check, migrate, health smoke), `docker-backend` (image build). **`main` ga push** dan keyin serverni avtomatik yangilash uchun repoda **Actions secrets** ga qo‘ying:
+
+| Secret | Ma’nosi |
+|--------|---------|
+| `DEPLOY_SSH_KEY` | Server `root` (yoki deploy user) uchun **to‘liq private key** (PEM). Bo‘lmasa deploy job o‘tkazib yuboriladi. |
+| `DEPLOY_HOST` | Ixtiyoriy; bo‘sh bo‘lsa `167.71.53.238`. |
+| `DEPLOY_USER` | Ixtiyoriy; bo‘sh bo‘lsa `root`. |
+
+Serverda publik kalit `authorized_keys` da bo‘lishi kerak. Ish jarayoni: `deploy/remote_full_update.sh` (git pull, migrate, `npm run build`, nginx, `systemctl restart clinicmonitoring-daphne`).
+
+Mahalliy masofadan: `python deploy/deploy_remote.py update` (`SSH_PASSWORD` yoki `~/.ssh/id_ed25519`).
 
 ## Xavfsizlik eslatmalari
 

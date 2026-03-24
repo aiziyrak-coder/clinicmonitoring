@@ -49,8 +49,8 @@ except ImportError:
     print("paramiko kerak: pip install paramiko", file=sys.stderr)
     sys.exit(1)
 
-HOST = os.environ.get("DEPLOY_HOST", "167.71.53.238")
-USER = os.environ.get("DEPLOY_USER", "root")
+HOST = (os.environ.get("DEPLOY_HOST") or "").strip() or "167.71.53.238"
+USER = (os.environ.get("DEPLOY_USER") or "").strip() or "root"
 CERTBOT_EMAIL = os.environ.get("CERTBOT_EMAIL", "admin@ziyrak.org")
 APP_ROOT_DEFAULT = os.environ.get("APP_ROOT", "/opt/clinicmonitoring")
 

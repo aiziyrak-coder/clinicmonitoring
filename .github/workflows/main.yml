@@ -59,6 +59,34 @@ jobs:
       - name: Build backend image (Dockerfile tekshiruvi)
         run: docker build -f backend/Dockerfile -t medicentral-backend:ci ./backend
 
+  # Production server: git pull, migrate, frontend build, nginx, Daphne restart (deploy/remote_full_update.sh)
+  # Repoda Secrets: DEPLOY_SSH_KEY (to'liq private key PEM), ixtiyoriy DEPLOY_HOST, DEPLOY_USER
+  deploy-server:
+    needs: [frontend, backend, docker-backend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.DEPLOY_SSH_KEY != ''
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-clinicmonitoring
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install paramiko
+        run: pip install paramiko
+      - name: Remote update (SSH)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PRIVATE_KEY_PATH: ${{ runner.temp }}/deploy_ed25519
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > "$SSH_PRIVATE_KEY_PATH"
+          chmod 600 "$SSH_PRIVATE_KEY_PATH"
+          export SSH_PRIVATE_KEY_PATH
+          python deploy/deploy_remote.py update
+
   # Registry va klaster kalitlari tayyor bo‘lganda yoqing (secrets: DOCKERHUB_*, KUBE_CONFIG)
   # docker-push:
   #   needs: docker-backend
