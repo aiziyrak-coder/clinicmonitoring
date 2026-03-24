@@ -1,0 +1,53 @@
+# Qo'lda: Actions → Server (manual) → Run workflow
+# Secret: DEPLOY_SSH_KEY (majburiy). Ixtiyoriy: DEPLOY_HOST, DEPLOY_USER
+name: Server (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy — git pull, migrate, frontend build, nginx, Daphne; restart — faqat Daphne + journal"
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - restart
+
+jobs:
+  remote:
+    runs-on: ubuntu-latest
+    if: secrets.DEPLOY_SSH_KEY != ''
+    concurrency:
+      group: deploy-clinicmonitoring
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install paramiko
+        run: pip install paramiko
+      - name: SSH — deploy yoki restart
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PRIVATE_KEY_PATH: ${{ runner.temp }}/deploy_ed25519
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > "$SSH_PRIVATE_KEY_PATH"
+          chmod 600 "$SSH_PRIVATE_KEY_PATH"
+          export SSH_PRIVATE_KEY_PATH
+          case "${{ github.event.inputs.action }}" in
+            restart) python deploy/deploy_remote.py daphne-restart-logs ;;
+            *) python deploy/deploy_remote.py update ;;
+          esac
+
+  missing-secret:
+    runs-on: ubuntu-latest
+    if: secrets.DEPLOY_SSH_KEY == ''
+    steps:
+      - name: DEPLOY_SSH_KEY yo'q
+        run: |
+          echo "::error::GitHub repo → Settings → Secrets → Actions → DEPLOY_SSH_KEY (SSH private key PEM) qo'shing."
+          exit 1

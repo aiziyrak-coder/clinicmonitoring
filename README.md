@@ -112,6 +112,8 @@ Serverda publik kalit `authorized_keys` da bo‘lishi kerak. Ish jarayoni: `depl
 
 Mahalliy masofadan: `python deploy/deploy_remote.py update` (`SSH_PASSWORD` yoki `~/.ssh/id_ed25519`).
 
+**Qo‘lda server:** GitHub → **Actions** → **Server (manual)** → *Run workflow* → `deploy` (to‘liq yangilash) yoki `restart` (faqat `clinicmonitoring-daphne` restart + journal).
+
 ## Xavfsizlik eslatmalari
 
 - `DEBUG=false` da standart `SECRET_KEY` ishlatilmaydi.
