@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+/* Dashboard: 3 ta och rang — yumshoq gradient animatsiya */
+@keyframes dashboard-gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@layer utilities {
+  .dashboard-bg-animated {
+    background: linear-gradient(
+      125deg,
+      #ecfdf5,
+      #e0f2fe,
+      #fafafa,
+      #ecfdf5
+    );
+    background-size: 320% 320%;
+    animation: dashboard-gradient-flow 14s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dashboard-bg-animated {
+      animation: none;
+      background-position: 50% 50%;
+    }
+  }
+}
+
 @layer base {
   html {
     @apply antialiased;

@@ -22,9 +22,9 @@ const Clock = memo(() => {
   }, []);
 
   return (
-    <div className="flex flex-col items-end justify-center">
-      <span className="text-sm font-bold text-zinc-900 tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
-      <span className="text-xs font-mono text-zinc-600">{format(currentTime, 'dd MMM yyyy')}</span>
+    <div className="flex flex-col items-end justify-center shrink-0 leading-tight">
+      <span className="text-xs sm:text-sm font-bold text-zinc-900 tabular-nums">{format(currentTime, 'HH:mm:ss')}</span>
+      <span className="text-[10px] sm:text-xs font-mono text-zinc-600">{format(currentTime, 'dd MMM yyyy')}</span>
     </div>
   );
 });
@@ -113,197 +113,196 @@ export function Dashboard() {
       >
         Asosiy mazmunga o&apos;tish
       </a>
-      {/* Background: lokal zamonaviy operatsion xona / diagnostika interyeri */}
-      <div className="fixed inset-0 z-0">
-        <img 
-          src="/bg-clinic-or.png" 
-          alt="" 
-          className="h-full w-full object-cover object-center opacity-100"
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-        />
-        <div
-          className="absolute inset-0 bg-white/55 backdrop-blur-[6px] sm:backdrop-blur-[14px] pointer-events-none"
-          aria-hidden
-        />
-      </div>
+      {/* Background: 3 rangli och gradient animatsiya (rasm yo'q) */}
+      <div
+        className="fixed inset-0 z-0 dashboard-bg-animated pointer-events-none"
+        aria-hidden
+      />
 
       {/* Content Wrapper */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Top Navigation Bar */}
-        <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 sm:px-6 py-4 bg-white/95 border-b border-zinc-200 shadow-sm backdrop-blur-md">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden border border-emerald-200 bg-zinc-50 shrink-0 shadow-sm">
-              <img src="/logo-fjsti.png" alt="" className="w-full h-full object-cover" />
+        {/* Top Navigation Bar — bitta gorizontal oqim: masshtab/joy yetmasa gorizontal scroll, tartib o'zgarmaydi */}
+        <header className="sticky top-0 z-40 bg-white/95 border-b border-zinc-200 shadow-sm backdrop-blur-md">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 px-3 sm:px-4 py-2 sm:py-3">
+            {/* Brand — qisqaradi, lekin tartibda qoladi */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0 max-w-[min(42vw,14rem)] sm:max-w-[18rem]">
+              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl overflow-hidden border border-emerald-200 bg-zinc-50 shadow-sm shrink-0">
+                <img src="/logo-fjsti.png" alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight truncate">ClinicMonitoring</h1>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="text-[10px] sm:text-xs text-zinc-600 font-mono uppercase tracking-wide truncate font-semibold">
+                    {clinicName ?? 'Klinika'}
+                  </p>
+                  {username ? (
+                    <span className="text-[10px] text-zinc-500 font-mono shrink-0 hidden md:inline">· {username}</span>
+                  ) : null}
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`flex items-center shrink-0 text-[9px] sm:text-[10px] px-1 py-px sm:px-1.5 sm:py-0.5 rounded-full border font-semibold ${wsConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
+                  >
+                    {wsConnected ? <Wifi className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" aria-hidden /> : <WifiOff className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" aria-hidden />}
+                    <span className="hidden min-[360px]:inline">{wsConnected ? 'Online' : 'Offline'}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-zinc-900 tracking-tight">ClinicMonitoring</h1>
-              <div className="flex items-center space-x-2 flex-wrap">
-                <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider max-w-[14rem] sm:max-w-none truncate font-semibold">
-                  {clinicName ?? 'Klinika'}
-                </p>
-                {username ? (
-                  <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">· {username}</span>
-                ) : null}
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={`flex items-center text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${wsConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
+
+            {/* Asosiy panel: bir qator, nowrap + gorizontal scroll */}
+            <div
+              className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300"
+              role="toolbar"
+              aria-label="Boshqaruv paneli"
+            >
+              <div className="relative w-[7.5rem] shrink-0 sm:w-36 md:w-40">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-500" aria-hidden />
+                </div>
+                <input
+                  type="search"
+                  autoComplete="off"
+                  placeholder="Bemor qidirish..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Bemor bo'yicha qidiruv"
+                  className="bg-white border border-zinc-300 text-zinc-900 text-xs sm:text-sm font-medium rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 w-full pl-8 pr-2 py-1.5 sm:py-2 outline-none shadow-sm"
+                />
+              </div>
+
+              <div className="hidden sm:block h-5 w-px bg-zinc-200 shrink-0" aria-hidden />
+
+              {/* Filtr tugmalari — doim yonma-yon */}
+              <div className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFilter('all')}
+                  className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-colors ${filter === 'all' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}
                 >
-                  {wsConnected ? <Wifi className="w-3 h-3 mr-1" aria-hidden /> : <WifiOff className="w-3 h-3 mr-1" aria-hidden />}
-                  {wsConnected ? 'Online' : 'Offline'}
+                  Barchasi ({patientList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('critical')}
+                  className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-colors inline-flex items-center ${filter === 'critical' ? 'bg-red-50 text-red-800 ring-1 ring-red-200' : 'text-zinc-600 hover:text-red-700'}`}
+                >
+                  <span className="mr-1 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" aria-hidden />
+                  Kritik ({criticalCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('warning')}
+                  className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-colors inline-flex items-center ${filter === 'warning' ? 'bg-amber-50 text-amber-900 ring-1 ring-amber-200' : 'text-zinc-600 hover:text-amber-800'}`}
+                >
+                  <span className="mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-500" aria-hidden />
+                  Ogohlantirish ({warningCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('pinned')}
+                  className={`whitespace-nowrap rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-colors inline-flex items-center ${filter === 'pinned' ? 'bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200' : 'text-zinc-600 hover:text-emerald-800'}`}
+                >
+                  <Pin className="mr-0.5 h-3 w-3 shrink-0 sm:mr-1" aria-hidden />
+                  Qadalgan ({pinnedCount})
+                </button>
+              </div>
+
+              <div className="hidden md:block h-5 w-px bg-zinc-200 shrink-0" aria-hidden />
+
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value as DepartmentFilter)}
+                aria-label="Bo'lim bo'yicha filtrlash"
+                className="shrink-0 rounded-lg border border-zinc-300 bg-white py-1 pl-2 pr-7 text-[11px] sm:text-xs font-medium text-zinc-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 min-w-[8.5rem] sm:min-w-[10rem]"
+              >
+                <option value="all">Barcha bo&apos;limlar</option>
+                <option value="reanimatsiya">Reanimatsiya</option>
+                <option value="palata">Umumiy palatalar</option>
+              </select>
+
+              <div className="hidden lg:block h-5 w-px bg-zinc-200 shrink-0" aria-hidden />
+
+              <div className="flex shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2 text-zinc-700">
+                <div className="hidden sm:flex items-center gap-1">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  <span className="whitespace-nowrap font-mono text-[10px] sm:text-xs">{wsConnected ? 'ONLAYN' : 'OFLAYN'}</span>
+                </div>
+                <Clock />
+
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="inline-flex shrink-0 items-center rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] sm:text-xs font-semibold text-red-800 transition-colors hover:bg-red-100 sm:px-2.5 sm:py-1.5"
+                  title="O'lim holati aniqlandi"
+                >
+                  <span className="mr-1 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" aria-hidden />
+                  <span className="hidden min-[400px]:inline">AI Prognoz</span>
+                  <span className="min-[400px]:hidden">AI</span>
+                </button>
+
+                <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAdmitModalOpen(true)}
+                    className="rounded-full p-1.5 transition-colors hover:bg-emerald-50 hover:text-emerald-800 sm:p-2"
+                    title="Yangi bemor qabul qilish"
+                    aria-label="Yangi bemor qabul qilish"
+                  >
+                    <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleAudioMute}
+                    className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
+                    title={isAudioMuted ? 'Ovozni yoqish' : "Ovozni o'chirish"}
+                    aria-label={isAudioMuted ? 'Signal ovozini yoqish' : "Signal ovozini o'chirish"}
+                  >
+                    {isAudioMuted ? <VolumeX className="h-4 w-4 text-red-500 sm:h-5 sm:w-5" aria-hidden /> : <Volume2 className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePrivacyMode}
+                    className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
+                    title="Maxfiylik rejimi"
+                    aria-label={privacyMode ? "Maxfiylik rejimini o'chirish" : "Maxfiylik rejimini yoqish"}
+                    aria-pressed={privacyMode}
+                  >
+                    {privacyMode ? <EyeOff className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsColorGuideOpen(true)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-zinc-200 bg-zinc-100 px-2 py-1 text-[11px] font-semibold text-zinc-800 transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900 sm:gap-2 sm:px-2.5 sm:py-1.5 sm:text-xs"
+                    title="Ranglar bo'yicha yo'riqnoma"
+                    aria-label="Ranglar bo'yicha to'liq yo'riqnoma"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-500 sm:h-4 sm:w-4" aria-hidden />
+                    <span className="hidden sm:inline">Yo&apos;riqnoma</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsModalOpen(true)}
+                    className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
+                    title="Sozlamalar"
+                    aria-label="Sozlamalar"
+                  >
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLogout()}
+                    className="rounded-full p-1.5 transition-colors hover:bg-red-500/10 hover:text-red-600 sm:p-2"
+                    title="Chiqish"
+                    aria-label="Tizimdan chiqish"
+                  >
+                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-
-        <div className="flex flex-1 min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-3 lg:flex-nowrap">
-          {/* Search */}
-          <div className="relative w-full min-w-[12rem] max-w-xs sm:w-auto">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-zinc-500" aria-hidden />
-            </div>
-            <input
-              type="search"
-              autoComplete="off"
-              placeholder="Bemor qidirish..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Bemor bo'yicha qidiruv"
-              className="bg-white border border-zinc-300 text-zinc-900 text-sm font-medium rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 block w-full sm:w-48 pl-10 p-2 outline-none transition-all sm:focus:w-64 shadow-sm"
-            />
-          </div>
-
-          <div className="h-6 w-px bg-zinc-200" />
-
-          {/* Status Indicators */}
-          <div className="flex flex-wrap gap-2">
-            <button 
-              type="button"
-              onClick={() => setFilter('all')}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'all' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}`}
-            >
-              Barchasi ({patientList.length})
-            </button>
-            <button 
-              type="button"
-              onClick={() => setFilter('critical')}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'critical' ? 'bg-red-50 text-red-800 border border-red-200' : 'text-zinc-600 hover:text-red-700'}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" aria-hidden />
-              Kritik ({criticalCount})
-            </button>
-            <button 
-              type="button"
-              onClick={() => setFilter('warning')}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'warning' ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'text-zinc-600 hover:text-amber-800'}`}
-            >
-              <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" aria-hidden />
-              Ogohlantirish ({warningCount})
-            </button>
-            <button 
-              type="button"
-              onClick={() => setFilter('pinned')}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center ${filter === 'pinned' ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'text-zinc-600 hover:text-emerald-800'}`}
-            >
-              <Pin className="w-3 h-3 mr-2" aria-hidden />
-              Qadalgan ({pinnedCount})
-            </button>
-          </div>
-
-          <div className="h-6 w-px bg-zinc-200" />
-
-          {/* Department Filter */}
-          <select 
-            value={departmentFilter} 
-            onChange={(e) => setDepartmentFilter(e.target.value as DepartmentFilter)}
-            aria-label="Bo'lim bo'yicha filtrlash"
-            className="bg-white border border-zinc-300 text-zinc-900 text-sm font-medium rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 block p-2 outline-none min-w-[10rem] shadow-sm"
-          >
-            <option value="all">Barcha bo'limlar</option>
-            <option value="reanimatsiya">Reanimatsiya</option>
-            <option value="palata">Umumiy palatalar</option>
-          </select>
-
-          <div className="h-6 w-px bg-zinc-200" />
-
-          <div className="flex items-center space-x-4 text-zinc-700">
-            <div className="flex items-center mr-2">
-              <span className={`w-2 h-2 rounded-full mr-2 ${wsConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-              <span className="text-xs font-mono">{wsConnected ? 'ONLAYN' : 'OFLAYN'}</span>
-            </div>
-            <Clock />
-            
-            <button
-              type="button"
-              onClick={() => setIsAiModalOpen(true)}
-              className="px-3 py-1.5 rounded-full bg-red-50 text-red-800 border border-red-200 hover:bg-red-100 transition-colors flex items-center text-sm font-semibold"
-              title="O'lim holati aniqlandi"
-            >
-              <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" aria-hidden />
-              AI Prognoz
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => setIsAdmitModalOpen(true)}
-              className="p-2 rounded-full hover:bg-emerald-50 hover:text-emerald-800 transition-colors" 
-              title="Yangi bemor qabul qilish"
-              aria-label="Yangi bemor qabul qilish"
-            >
-              <UserPlus className="w-5 h-5" aria-hidden />
-            </button>
-            <button 
-              type="button"
-              onClick={toggleAudioMute} 
-              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
-              title={isAudioMuted ? "Ovozni yoqish" : "Ovozni o'chirish"}
-              aria-label={isAudioMuted ? "Signal ovozini yoqish" : "Signal ovozini o'chirish"}
-            >
-              {isAudioMuted ? <VolumeX className="w-5 h-5 text-red-500" aria-hidden /> : <Volume2 className="w-5 h-5 text-emerald-500" aria-hidden />}
-            </button>
-            <button 
-              type="button"
-              onClick={togglePrivacyMode} 
-              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
-              title="Maxfiylik rejimi"
-              aria-label={privacyMode ? "Maxfiylik rejimini o'chirish" : "Maxfiylik rejimini yoqish"}
-              aria-pressed={privacyMode}
-            >
-              {privacyMode ? <EyeOff className="w-5 h-5 text-emerald-500" aria-hidden /> : <Eye className="w-5 h-5" aria-hidden />}
-            </button>
-            <button 
-              type="button"
-              onClick={() => setIsColorGuideOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-zinc-100 border border-zinc-200 text-zinc-800 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900 transition-colors"
-              title="Ranglar bo'yicha yo'riqnoma"
-              aria-label="Ranglar bo'yicha to'liq yo'riqnoma"
-            >
-              <BookOpen className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Yo&apos;riqnoma</span>
-            </button>
-            <button 
-              type="button"
-              onClick={() => setIsSettingsModalOpen(true)}
-              className="p-2 rounded-full hover:bg-zinc-100 transition-colors" 
-              title="Sozlamalar"
-              aria-label="Sozlamalar"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="p-2 rounded-full hover:bg-red-500/10 hover:text-red-400 transition-colors"
-              title="Chiqish"
-              aria-label="Tizimdan chiqish"
-            >
-              <LogOut className="w-5 h-5" aria-hidden />
-            </button>
-          </div>
-        </div>
-      </header>
+        </header>
 
       {/* Main Content Grid */}
       <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 flex-1 outline-none">
