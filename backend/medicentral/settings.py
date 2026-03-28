@@ -67,7 +67,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "corsheaders",
+    "drf_spectacular",
     "channels",
     "monitoring.apps.MonitoringConfig",
 ]
@@ -155,8 +155,18 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/hour",
+    },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 if not DEBUG:
@@ -165,9 +175,11 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", True)
     CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
+    CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SAMESITE = "Strict"
     CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = "Lax"
     if _env_bool("DJANGO_SECURE_SSL_REDIRECT", False):
         SECURE_SSL_REDIRECT = True
         SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
@@ -197,20 +209,20 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "{levelname} {asctime} {name}: {message}",
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
             "style": "{",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "standard",
+            "formatter": "verbose",
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": _log_level,
+        "level": "INFO",
     },
     "loggers": {
         "django": {
@@ -218,10 +230,17 @@ LOGGING = {
             "level": _log_level,
             "propagate": False,
         },
-        "django.request": {
+        "monitoring": {
             "handlers": ["console"],
-            "level": "WARNING",
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "MediCentral API",
+    "DESCRIPTION": "Real-time Patient Monitoring System API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }

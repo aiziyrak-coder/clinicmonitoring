@@ -2,10 +2,11 @@ import { useEffect, useState, memo, useMemo, useRef } from 'react';
 import { useAuthStore } from '../authStore';
 import { useStore } from '../store';
 import { PatientMonitor } from './PatientMonitor';
-import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, WifiOff, Pin, BookOpen, LogOut } from 'lucide-react';
+import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, WifiOff, Pin, BookOpen, LogOut, Moon, Sun, FlaskConical, RefreshCw, Brain } from 'lucide-react';
 import { format } from 'date-fns';
 import { PatientDetailsModal } from './PatientDetailsModal';
 import { AdmitPatientModal } from './AdmitPatientModal';
+import { SimulationModal } from './SimulationModal';
 import { useAudioAlarm } from '../hooks/useAudioAlarm';
 import { SettingsModal } from './SettingsModal';
 import { AiPredictionModal } from './AiPredictionModal';
@@ -43,6 +44,14 @@ export function Dashboard() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isColorGuideOpen, setIsColorGuideOpen] = useState(false);
+  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark') || 
+             (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
   const [previousAiRiskCount, setPreviousAiRiskCount] = useState(0);
   const skipInitialAiNotification = useRef(true);
 
@@ -105,8 +114,22 @@ export function Dashboard() {
   const warningPatients = useMemo(() => filteredPatients.filter(p => p.alarm.level === 'yellow' || p.alarm.level === 'blue' || p.alarm.level === 'purple'), [filteredPatients]);
   const stablePatients = useMemo(() => filteredPatients.filter(p => p.alarm.level === 'none'), [filteredPatients]);
 
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  const hasEmergency = useStore(state => state.hasEmergency());
+
   return (
-    <div className="min-h-screen text-zinc-800 font-sans font-medium selection:bg-emerald-500/20 relative">
+    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 ${hasEmergency ? 'emergency-pulse border-4 border-red-500/50' : ''}`}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -115,14 +138,14 @@ export function Dashboard() {
       </a>
       {/* Background: 3 rangli och gradient animatsiya (rasm yo'q) */}
       <div
-        className="fixed inset-0 z-0 dashboard-bg-animated pointer-events-none"
+        className={`fixed inset-0 z-0 dashboard-bg-animated pointer-events-none transition-opacity duration-700 ${isDarkMode ? 'opacity-20 hue-rotate-180 brightness-50' : 'opacity-100'}`}
         aria-hidden
       />
 
       {/* Content Wrapper */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Top Navigation Bar — bitta gorizontal oqim: masshtab/joy yetmasa gorizontal scroll, tartib o'zgarmaydi */}
-        <header className="sticky top-0 z-40 bg-white/95 border-b border-zinc-200 shadow-sm backdrop-blur-md">
+        <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800 shadow-sm backdrop-blur-xl transition-colors duration-300">
           <div className="mx-auto flex w-full max-w-[100vw] min-w-0 flex-col gap-2 px-3 py-2 sm:px-4 sm:py-2.5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
             {/* Chap: brend + klinika nomi to‘liq (kesishsiz, qatorlarga bo‘linadi) */}
             <div className="flex min-w-0 shrink-0 items-start gap-2 sm:gap-3 lg:max-w-[min(100%,28rem)] xl:max-w-[32rem]">
@@ -259,13 +282,30 @@ export function Dashboard() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setIsSimulationModalOpen(true)}
+                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
+                  title="Vitals Simulyatsiyasi (Lab)"
+                >
+                  <FlaskConical className="h-4 w-4 text-purple-600 dark:text-purple-400 sm:h-5 sm:w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleDarkMode}
+                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
+                  title={isDarkMode ? 'Yorug‘ rejim' : "Qorong‘u rejim"}
+                  aria-label="Rang rejimini almashtirish"
+                >
+                  {isDarkMode ? <Sun className="h-4 w-4 text-amber-400 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 text-zinc-600 sm:h-5 sm:w-5" />}
+                </button>
+                <button
+                  type="button"
                   onClick={togglePrivacyMode}
-                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
+                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
                   title="Maxfiylik rejimi"
                   aria-label={privacyMode ? "Maxfiylik rejimini o'chirish" : "Maxfiylik rejimini yoqish"}
                   aria-pressed={privacyMode}
                 >
-                  {privacyMode ? <EyeOff className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />}
+                  {privacyMode ? <EyeOff className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden /> : <Eye className="h-4 w-4 dark:text-zinc-400 sm:h-5 sm:w-5" aria-hidden />}
                 </button>
                 <button
                   type="button"
@@ -299,6 +339,70 @@ export function Dashboard() {
             </div>
           </div>
         </header>
+
+        {/* Global Stats Bar — Premium Dashboard Feel */}
+        <div className="px-4 pt-4 sm:px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {/* Total Patients */}
+            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Bemorlar</p>
+                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">{patientList.length}</p>
+              </div>
+            </div>
+
+            {/* Critical Alarms */}
+            <div className={`glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3 ${criticalCount > 0 ? 'ring-2 ring-red-500/50 animate-pulse' : ''}`}>
+              <div className={`p-2 rounded-lg ${criticalCount > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+                <Activity className={`w-5 h-5 ${criticalCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Kritik</p>
+                <p className={`text-xl font-black ${criticalCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalCount}</p>
+              </div>
+            </div>
+
+            {/* Warning Alarms */}
+            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${warningCount > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+                <RefreshCw className={`w-5 h-5 ${warningCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ogohlantirish</p>
+                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">{warningCount}</p>
+              </div>
+            </div>
+
+            {/* Average NEWS2 Score */}
+            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">O'rtacha NEWS2</p>
+                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">
+                  {patientList.length > 0 ? (patientList.reduce((acc, p) => acc + p.news2Score, 0) / patientList.length).toFixed(1) : '–'}
+                </p>
+              </div>
+            </div>
+
+            {/* Connection Health */}
+            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3 hidden lg:flex">
+              <div className={`p-2 rounded-lg ${wsConnected ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                <Wifi className={`w-5 h-5 ${wsConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tizim holati</p>
+                <p className={`text-sm font-black uppercase ${wsConnected ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {wsConnected ? 'Ishlayapti' : 'Aloqa yo\'q'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
       {/* Main Content Grid */}
       <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 flex-1 outline-none">
@@ -418,6 +522,11 @@ export function Dashboard() {
       )}
       {isAiModalOpen && <AiPredictionModal onClose={() => setIsAiModalOpen(false)} />}
       {isColorGuideOpen && <ColorGuideModal onClose={() => setIsColorGuideOpen(false)} />}
+      <SimulationModal 
+        isOpen={isSimulationModalOpen}
+        onClose={() => setIsSimulationModalOpen(false)}
+        patients={patients}
+      />
     </div>
   );
 }

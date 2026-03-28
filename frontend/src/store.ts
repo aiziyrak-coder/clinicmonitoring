@@ -1,6 +1,7 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-import { getWebSocketMonitoringUrl } from './lib/api';
+import { getWebSocketMonitoringUrl, apiUrl } from './lib/api';
 
 export interface VitalSigns {
   hr: number;
@@ -149,10 +150,12 @@ interface AppState {
   searchQuery: string;
   selectedPatientId: string | null;
   isAudioMuted: boolean;
+  errorMessage: string | null;
   togglePrivacyMode: () => void;
   setSearchQuery: (q: string) => void;
   setSelectedPatientId: (id: string | null) => void;
   toggleAudioMute: () => void;
+  setErrorMessage: (msg: string | null) => void;
   togglePinPatient: (patientId: string) => void;
   addClinicalNote: (patientId: string, note: Omit<ClinicalNote, 'id' | 'time'>) => void;
   acknowledgeAlarm: (patientId: string) => void;
@@ -163,26 +166,32 @@ interface AppState {
   measureNibp: (patientId: string) => void;
   admitPatient: (data: Partial<PatientData> & { bedId?: string }) => void;
   dischargePatient: (patientId: string) => void;
+  loadPatientsFromAPI: () => Promise<void>;
   connect: () => void;
   disconnect: () => void;
+  hasEmergency: () => boolean;
 }
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
 let manualDisconnect = false;
 
-export const useStore = create<AppState>((set, get) => ({
-  patients: {},
-  socket: null,
-  wsConnected: false,
-  privacyMode: false,
-  searchQuery: '',
-  selectedPatientId: null,
-  isAudioMuted: false,
-
+export const useStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      patients: {},
+      socket: null,
+      wsConnected: false,
+      privacyMode: false,
+      searchQuery: '',
+      selectedPatientId: null,
+      isAudioMuted: false,
+      errorMessage: null,
   togglePrivacyMode: () => set((state) => ({ privacyMode: !state.privacyMode })),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSelectedPatientId: (id) => set({ selectedPatientId: id }),
   toggleAudioMute: () => set((state) => ({ isAudioMuted: !state.isAudioMuted })),
+  setErrorMessage: (msg) => set({ errorMessage: msg }),
 
   togglePinPatient: (patientId) => {
     sendWs(get().socket, { action: 'toggle_pin', patientId });
@@ -216,6 +225,34 @@ export const useStore = create<AppState>((set, get) => ({
     sendWs(get().socket, { action: 'discharge_patient', patientId });
   },
 
+  loadPatientsFromAPI: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await fetch(apiUrl('/patients/'), {
+        headers: {
+          'Authorization': `Token ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const patients = await response.json();
+        set((state) => ({
+          patients: patients.reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as Record<string, PatientData>)
+        }));
+        console.log(`✅ Loaded ${patients.length} patients from API`);
+      } else {
+        console.error('❌ Failed to load patients from API:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading patients:', error);
+    }
+  },
+  
   connect: () => {
     const existing = get().socket;
     if (
@@ -231,6 +268,9 @@ export const useStore = create<AppState>((set, get) => ({
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+
+    // Load patients from API first
+    get().loadPatientsFromAPI();
 
     const ws = new WebSocket(getWebSocketMonitoringUrl());
 
@@ -311,6 +351,16 @@ export const useStore = create<AppState>((set, get) => ({
             };
           });
         }
+
+        // Handle error messages (e.g., bed occupied)
+        if (msg.type === 'error') {
+          const errorMsg = msg as any;
+          set({ errorMessage: errorMsg.message || 'Noma\'lum xato' });
+          // Auto-clear after 5 seconds
+          setTimeout(() => {
+            set({ errorMessage: null });
+          }, 5000);
+        }
       } catch (e) {
         console.error('WebSocket message parse error:', e);
       }
@@ -318,6 +368,16 @@ export const useStore = create<AppState>((set, get) => ({
 
     ws.onopen = () => {
       set({ socket: ws, wsConnected: true });
+      reconnectAttempts = 0; // Reset on successful connection
+      
+      // Start heartbeat
+      const interval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } else {
+          clearInterval(interval);
+        }
+      }, 30000);
     };
 
     ws.onerror = () => {
@@ -327,10 +387,13 @@ export const useStore = create<AppState>((set, get) => ({
     ws.onclose = () => {
       set({ socket: null, wsConnected: false });
       if (!manualDisconnect) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+        reconnectAttempts++;
+        console.log(`📡 WebSocket closed. Reconnecting in ${delay}ms... (Attempt ${reconnectAttempts})`);
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           get().connect();
-        }, 2500);
+        }, delay);
       }
     };
 
@@ -349,4 +412,21 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set({ socket: null, wsConnected: false });
   },
-}));
+
+  hasEmergency: () => {
+    return Object.values(get().patients).some(p => p.alarm.level === 'red');
+  },
+}),
+    {
+      name: 'medicentral-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        patients: state.patients,
+        privacyMode: state.privacyMode,
+        searchQuery: state.searchQuery,
+        selectedPatientId: state.selectedPatientId,
+        isAudioMuted: state.isAudioMuted
+      })
+    }
+  )
+);

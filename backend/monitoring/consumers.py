@@ -42,4 +42,10 @@ class MonitoringConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
         except json.JSONDecodeError:
             return
+            
+        # Heartbeat support
+        if data.get("type") == "ping":
+            await self.send(text_data=json.dumps({"type": "pong"}))
+            return
+            
         await database_sync_to_async(handle_ws_message)(data, self.clinic_id)

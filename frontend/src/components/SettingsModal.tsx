@@ -118,6 +118,10 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   const [promptConfig, setPromptConfig] = useState<{isOpen: boolean, title: string, fields: any[], onSubmit: (data: any) => void} | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void} | null>(null);
   const [showAddDeviceFromScreen, setShowAddDeviceFromScreen] = useState(false);
+  
+  // Drill-down navigation for structure
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
   const fetchData = async (signal?: AbortSignal) => {
     try {
@@ -262,17 +266,24 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   };
 
   const deleteDepartment = (id: string) => {
+    if (!id || id.trim() === '') {
+      console.error('❌ Xatolik: Bo\'lim ID si bo\'sh!');
+      setError("Bo'lim topilmadi yoki ID noto'g'ri");
+      return;
+    }
+    
     setConfirmConfig({
       isOpen: true,
       title: "Bo'limni o'chirish",
       message: "Rostdan ham bu bo'limni o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
+          console.log(`🗑️ Deleting department: ${id}`);
           await authedFetch(`/api/departments/${id}/`, { method: 'DELETE' });
           closeDialogs();
           fetchData();
         } catch (e) {
-          console.error(e);
+          console.error('Delete error:', e);
           setError("Xatolik yuz berdi");
         }
       }
@@ -280,6 +291,10 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   };
 
   const addRoom = (deptId: string) => {
+    if (!deptId) {
+      setError("Bo'lim tanlanmagan!");
+      return;
+    }
     setPromptConfig({
       isOpen: true,
       title: "Yangi palata qo'shish",
@@ -299,17 +314,24 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   };
 
   const deleteRoom = (id: string) => {
+    if (!id || id.trim() === '') {
+      console.error('❌ Xatolik: Palata ID si bo\'sh!');
+      setError("Palata topilmadi yoki ID noto'g'ri");
+      return;
+    }
+    
     setConfirmConfig({
       isOpen: true,
       title: "Palatani o'chirish",
       message: "Rostdan ham bu palatani o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
+          console.log(`🗑️ Deleting room: ${id}`);
           await authedFetch(`/api/rooms/${id}/`, { method: 'DELETE' });
           closeDialogs();
           fetchData();
         } catch (e) {
-          console.error(e);
+          console.error('Delete error:', e);
           setError("Xatolik yuz berdi");
         }
       }
@@ -336,17 +358,24 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
   };
 
   const deleteBed = (id: string) => {
+    if (!id || id.trim() === '') {
+      console.error('❌ Xatolik: Joy ID si bo\'sh!');
+      setError("Joy topilmadi yoki ID noto'g'ri");
+      return;
+    }
+    
     setConfirmConfig({
       isOpen: true,
       title: "Joyni o'chirish",
       message: "Rostdan ham bu joyni o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
+          console.log(`🗑️ Deleting bed: ${id}`);
           await authedFetch(`/api/beds/${id}/`, { method: 'DELETE' });
           closeDialogs();
           fetchData();
         } catch (e) {
-          console.error(e);
+          console.error('Delete error:', e);
           setError("Xatolik yuz berdi");
         }
       }
@@ -492,50 +521,142 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                 {activeTab === 'structure' && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-medium text-white">Kasalxona Tuzilmasi</h3>
-                      <button onClick={addDepartment} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-800 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
-                        <Plus className="w-4 h-4 mr-1" /> Bo'lim qo'shish
-                      </button>
+                      <h3 className="text-lg font-medium text-white">
+                        {selectedRoomId ? 'Joylar' : selectedDeptId ? 'Palatalar' : 'Kasalxona Tuzilmasi'}
+                      </h3>
+                      <div className="flex items-center space-x-2">
+                        {/* Back button */}
+                        {(selectedRoomId || selectedDeptId) && (
+                          <button 
+                            onClick={() => { setSelectedRoomId(null); setSelectedDeptId(null); }} 
+                            className="px-3 py-1.5 text-sm bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 transition-colors"
+                          >
+                            ← Bosh sahifa
+                          </button>
+                        )}
+                        {/* Add buttons based on current level */}
+                        {!selectedDeptId && (
+                          <button onClick={addDepartment} className="flex items-center px-3 py-1.5 bg-emerald-500/20 text-emerald-800 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm">
+                            <Plus className="w-4 h-4 mr-1" /> Bo'lim qo'shish
+                          </button>
+                        )}
+                        {selectedDeptId && !selectedRoomId && (
+                          <button onClick={() => addRoom(selectedDeptId)} className="flex items-center px-3 py-1.5 bg-blue-500/20 text-blue-800 rounded-lg hover:bg-blue-500/30 transition-colors text-sm">
+                            <Plus className="w-4 h-4 mr-1" /> Palata qo'shish
+                          </button>
+                        )}
+                        {selectedDeptId && selectedRoomId && (
+                          <button onClick={() => addBed(selectedRoomId)} className="flex items-center px-3 py-1.5 bg-purple-500/20 text-purple-800 rounded-lg hover:bg-purple-500/30 transition-colors text-sm">
+                            <Plus className="w-4 h-4 mr-1" /> Joy qo'shish
+                          </button>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="space-y-4">
-                      {data.departments.map((dept: any) => (
-                        <div key={dept.id} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-md font-bold text-emerald-800">{dept.name} (ID: {dept.id})</h4>
-                            <div className="flex space-x-2">
-                              <button onClick={() => addRoom(dept.id)} className="p-1.5 text-zinc-600 hover:text-emerald-800 bg-zinc-100 rounded-md"><Plus className="w-4 h-4" /></button>
-                              <button onClick={() => deleteDepartment(dept.id)} className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {data.rooms.filter((r: any) => r.departmentId === dept.id).map((room: any) => (
-                              <div key={room.id} className="bg-white border border-zinc-200 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium text-zinc-900">{room.name}</span>
-                                  <div className="flex space-x-2">
-                                    <button onClick={() => addBed(room.id)} className="p-1 text-zinc-500 hover:text-emerald-800"><Plus className="w-3 h-3" /></button>
-                                    <button onClick={() => deleteRoom(room.id)} className="p-1 text-zinc-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
-                                  </div>
+                    {/* Departments List (Main Level) */}
+                    {!selectedDeptId && (
+                      <div className="space-y-4">
+                        {data.departments.length === 0 ? (
+                          <p className="text-zinc-400 text-sm">Bo'limlar yo'q. Birinchi bo'limni qo'shing.</p>
+                        ) : (
+                          data.departments.map((dept: any) => (
+                            <div 
+                              key={dept.id} 
+                              className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-all"
+                              onClick={() => setSelectedDeptId(dept.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-md font-bold text-emerald-800">{dept.name}</h4>
+                                  <p className="text-xs text-zinc-500 mt-1">ID: {dept.id}</p>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {data.beds.filter((b: any) => b.roomId === room.id).map((bed: any) => (
-                                    <div key={bed.id} className="flex items-center px-2 py-1 bg-white rounded text-xs text-zinc-800 border border-zinc-200 font-medium">
-                                      {bed.name} (ID: {bed.id})
-                                      <button onClick={() => deleteBed(bed.id)} className="ml-2 text-zinc-600 hover:text-red-400"><X className="w-3 h-3" /></button>
-                                    </div>
-                                  ))}
-                                  {data.beds.filter((b: any) => b.roomId === room.id).length === 0 && (
-                                    <span className="text-xs text-zinc-600 italic">Joylar yo'q</span>
-                                  )}
+                                <div className="flex space-x-2">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); deleteDepartment(dept.id); }} 
+                                    className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Rooms List (Drilled down from Department) */}
+                    {selectedDeptId && !selectedRoomId && (
+                      <div className="space-y-4">
+                        <button 
+                          onClick={() => setSelectedDeptId(null)} 
+                          className="text-sm text-emerald-600 hover:text-emerald-700 mb-2"
+                        >
+                          ← Barcha bo'limlarga qaytish
+                        </button>
+                        {data.rooms.filter((r: any) => r.departmentId === selectedDeptId).length === 0 ? (
+                          <p className="text-zinc-400 text-sm">Bu bo'limda palatalar yo'q.</p>
+                        ) : (
+                          data.rooms.filter((r: any) => r.departmentId === selectedDeptId).map((room: any) => (
+                            <div 
+                              key={room.id} 
+                              className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all"
+                              onClick={() => setSelectedRoomId(room.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-md font-bold text-blue-800">{room.name}</h4>
+                                  <p className="text-xs text-zinc-500 mt-1">ID: {room.id}</p>
+                                </div>
+                                <div className="flex space-x-2">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); deleteRoom(room.id); }} 
+                                    className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Beds List (Drilled down from Room) */}
+                    {selectedDeptId && selectedRoomId && (
+                      <div className="space-y-4">
+                        <button 
+                          onClick={() => { setSelectedRoomId(null); }} 
+                          className="text-sm text-blue-600 hover:text-blue-700 mb-2"
+                        >
+                          ← Barcha palatalarga qaytish
+                        </button>
+                        {data.beds.filter((b: any) => b.roomId === selectedRoomId).length === 0 ? (
+                          <p className="text-zinc-400 text-sm">Bu palatada joylar yo'q.</p>
+                        ) : (
+                          data.beds.filter((b: any) => b.roomId === selectedRoomId).map((bed: any) => (
+                            <div 
+                              key={bed.id} 
+                              className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 hover:bg-purple-50 hover:border-purple-300 transition-all"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-md font-bold text-purple-800">{bed.name}</h4>
+                                  <p className="text-xs text-zinc-500 mt-1">ID: {bed.id}</p>
+                                </div>
+                                <button 
+                                  onClick={() => deleteBed(bed.id)} 
+                                  className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-100 rounded-md"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

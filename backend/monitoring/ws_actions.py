@@ -10,7 +10,7 @@ from typing import Any
 from django.db import transaction
 
 from monitoring.broadcast import broadcast_event
-from monitoring.models import Bed, ClinicalNote, Patient
+from monitoring.models import Bed, ClinicalNote, Patient, ClinicalAuditLog
 from monitoring.serializers import patient_to_dict, serialize_all_patients
 from monitoring.simulation import DEFAULT_LIMITS
 
@@ -164,11 +164,21 @@ def handle_ws_message(data: dict[str, Any], clinic_id: str) -> dict[str, Any] | 
 
     if action == "discharge_patient":
         pid = data.get("patientId")
-        deleted, _ = Patient.objects.filter(
-            id=pid,
-            bed__room__department__clinic_id=clinic_id,
-        ).delete()
-        if deleted:
+        p = _patient_in_clinic(pid, clinic_id)
+        if p:
+            # Audit log yaratish (o'chirishdan oldin)
+            ClinicalAuditLog.objects.create(
+                action="DISCHARGE",
+                patient=None, # Patient o'chiriladi, shuning uchun details ga yozamiz
+                details={
+                    "patient_id": pid,
+                    "patient_name": p.name,
+                    "room": p.room,
+                    "diagnosis": p.diagnosis,
+                    "reason": "Manual discharge from UI"
+                }
+            )
+            p.delete()
             broadcast_event(
                 {"type": "patient_discharged", "patientId": pid},
                 clinic_id,
@@ -182,6 +192,7 @@ def handle_ws_message(data: dict[str, Any], clinic_id: str) -> dict[str, Any] | 
         bed_id = body.get("bedId") or body.get("bed_id")
         bed: Bed | None = None
         room_label = (body.get("room") or "").strip()
+        
         if bed_id:
             bed = (
                 Bed.objects.select_related("room", "room__department")
@@ -189,6 +200,27 @@ def handle_ws_message(data: dict[str, Any], clinic_id: str) -> dict[str, Any] | 
                 .first()
             )
             if bed:
+                # Tekshirish: bu bo'sh joyda boshqa bemor bormi?
+                from monitoring.models import Patient as PatientModel
+                existing_patient = PatientModel.objects.filter(
+                    bed=bed
+                ).first()
+                
+                if existing_patient:
+                    # Agar bu joy band bo'lsa, xato qaytarish
+                    # Broadcast orqali frontendga xabar yuborish
+                    from monitoring.broadcast import broadcast_event
+                    broadcast_event(
+                        {
+                            "type": "error",
+                            "message": "Bu joy band!",
+                            "bedId": bed_id,
+                            "occupiedBy": existing_patient.name
+                        },
+                        clinic_id,
+                    )
+                    return None
+                
                 dept = getattr(bed.room, "department", None)
                 if dept:
                     room_label = f"{dept.name} — {bed.room.name}, {bed.name}"
@@ -217,7 +249,18 @@ def handle_ws_message(data: dict[str, Any], clinic_id: str) -> dict[str, Any] | 
             is_pinned=False,
             scheduled_interval_ms=60000,
             scheduled_next_check=now + 60000,
+            clinic_id=clinic_id,
             bed=bed,
+        )
+        
+        # Audit log
+        ClinicalAuditLog.objects.create(
+            action="ADMIT",
+            patient=p,
+            details={
+                "bed_id": bed_id,
+                "room_label": room_label
+            }
         )
         broadcast_event(
             {"type": "patient_admitted", "patient": patient_to_dict(p)},

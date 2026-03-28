@@ -21,20 +21,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   csrfToken: '',
 
   checkSession: async () => {
-    const r = await fetch(apiUrl('/api/auth/session/'), { credentials: 'include' });
-    const d = (await r.json()) as {
-      authenticated?: boolean;
-      username?: string;
-      csrfToken?: string;
-      clinic?: { name?: string };
-    };
-    set({
-      checked: true,
-      authenticated: Boolean(d.authenticated),
-      username: d.username ?? null,
-      clinicName: d.clinic?.name ?? null,
-      csrfToken: d.csrfToken ?? '',
-    });
+    try {
+      const r = await fetch(apiUrl('/api/auth/session/'), { 
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      if (!r.ok) {
+        console.error('Session check failed:', r.status, r.statusText);
+        set({ checked: true, authenticated: false, username: null, clinicName: null, csrfToken: '' });
+        return;
+      }
+      const d = (await r.json()) as {
+        authenticated?: boolean;
+        username?: string;
+        csrfToken?: string;
+        clinic?: { name?: string };
+      };
+      set({
+        checked: true,
+        authenticated: Boolean(d.authenticated),
+        username: d.username ?? null,
+        clinicName: d.clinic?.name ?? null,
+        csrfToken: d.csrfToken ?? '',
+      });
+    } catch (error) {
+      console.error('Session check error:', error);
+      set({ checked: true, authenticated: false, username: null, clinicName: null, csrfToken: '' });
+    }
   },
 
   login: async (username, password) => {

@@ -176,6 +176,9 @@ class Patient(models.Model):
 
     ai_risk = models.JSONField(null=True, blank=True)
 
+    clinic = models.ForeignKey(
+        Clinic, on_delete=models.CASCADE, related_name="patients", null=True, blank=True
+    )
     bed = models.ForeignKey(Bed, null=True, blank=True, on_delete=models.SET_NULL, related_name="patients")
 
     class Meta:
@@ -221,3 +224,27 @@ class VitalHistoryEntry(models.Model):
 
     class Meta:
         ordering = ["timestamp"]
+
+
+class ClinicalAuditLog(models.Model):
+    ACTION_CHOICES = [
+        ("ADMIT", "Patient Admitted"),
+        ("DISCHARGE", "Patient Discharged"),
+        ("VITAL_CHANGE", "Vital Thresholds Changed"),
+        ("DEVICE_LINK", "Device Linked/Unlinked"),
+        ("SECURITY", "Security Event"),
+    ]
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    action = models.CharField(max_length=32, choices=ACTION_CHOICES)
+    patient = models.ForeignKey(
+        Patient, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    details = models.JSONField(default=dict)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]

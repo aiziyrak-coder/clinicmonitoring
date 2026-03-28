@@ -2,6 +2,12 @@
 services:
   redis:
     image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "6379:6379"
     volumes:
@@ -11,15 +17,24 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: always
     ports:
       - "8000:8000"
     environment:
-      DJANGO_DEBUG: "true"
+      DJANGO_DEBUG: "false"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       REDIS_URL: redis://redis:6379/0
       DJANGO_SQLITE_PATH: /app/data/db.sqlite3
+      DJANGO_SESSION_COOKIE_SECURE: "true"
+      DJANGO_CSRF_COOKIE_SECURE: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     volumes:
       - backend_sqlite:/app/data
 

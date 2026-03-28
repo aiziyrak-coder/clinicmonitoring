@@ -1,0 +1,7 @@
+{
+  "name": "deploy-tools",
+  "version": "1.0.0",
+  "dependencies": {
+    "ssh2": "^1.17.0"
+  }
+}

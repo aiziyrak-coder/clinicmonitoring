@@ -27,3 +27,11 @@ def patients_queryset_for_clinic(clinic: Clinic):
     return Patient.objects.filter(bed__room__department__clinic=clinic).prefetch_related(
         "medications", "labs", "notes"
     )
+
+
+def get_default_clinic() -> Clinic | None:
+    """
+    Default klinikani qaytarish (birinchi yoki yagona klinika).
+    Auto-provision uchun ishlatiladi.
+    """
+    return Clinic.objects.order_by("id").first()

@@ -93,54 +93,107 @@ def serialize_all_patients(clinic_id: str | None = None) -> list[dict[str, Any]]
         qs = qs.filter(bed__room__department__clinic_id=clinic_id)
     return [
         patient_to_dict(p)
-        for p in qs.prefetch_related("medications", "labs", "notes")
+        for p in qs.prefetch_related(
+            "medications", "labs", "notes", "history_entries"
+        )
     ]
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
-    clinicId = serializers.PrimaryKeyRelatedField(
-        queryset=Clinic.objects.all(),
-        source="clinic",
-        required=False,
-        allow_null=True,
-    )
+    clinicId = serializers.CharField(source="clinic.id", read_only=True)
 
     class Meta:
         model = Department
         fields = ["id", "name", "clinicId"]
+        extra_kwargs = {"id": {"required": False}}
 
-    def create(self, validated_data: dict[str, Any]) -> Department:
-        if "clinic" not in validated_data and self.context.get("clinic"):
-            validated_data["clinic"] = self.context["clinic"]
-        if "clinic" not in validated_data:
+    def create(self, validated_data):
+        # Klinikani avto aniqlash - context orqali
+        clinic = self.context.get("clinic")
+        if not clinic:
             req = self.context.get("request")
-            if req and getattr(req.user, "is_superuser", False):
-                c0 = Clinic.objects.order_by("id").first()
-                if c0:
-                    validated_data["clinic"] = c0
-        if "clinic" not in validated_data:
-            raise serializers.ValidationError(
-                {"clinicId": "Klinika tanlash majburiy (yoki admin orqali)."}
-            )
+            if req and hasattr(req, 'user') and req.user.is_authenticated:
+                # Agar superuser bo'lsa, birinchi klinikani olamiz
+                if req.user.is_superuser:
+                    clinic = Clinic.objects.first()
+                else:
+                    # Oddiy user uchun uning klinikasini olamiz
+                    from monitoring.clinic_scope import get_clinic_for_user
+                    clinic = get_clinic_for_user(req.user)
+        
+        if clinic:
+            validated_data["clinic"] = clinic
+        else:
+            raise serializers.ValidationError({"clinicId": "Klinika topilmadi"})
+        
+        # ID generatsiya qilish (agar yo'q bo'lsa)
+        if "id" not in validated_data:
+            import uuid
+            validated_data["id"] = str(uuid.uuid4())[:8]
+        
         return super().create(validated_data)
 
 
 class RoomSerializer(serializers.ModelSerializer):
-    departmentId = serializers.PrimaryKeyRelatedField(
-        queryset=Department.objects.all(), source="department"
-    )
+    departmentId = serializers.CharField(source="department.id", read_only=True)
 
     class Meta:
         model = Room
         fields = ["id", "name", "departmentId"]
+        extra_kwargs = {"id": {"required": False}}
+    
+    def create(self, validated_data):
+        # Department ni olish (frontend departmentId yuboradi)
+        request = self.context.get('request')
+        if request and hasattr(request, 'data'):
+            dept_id = request.data.get('departmentId') or request.data.get('department_id')
+            if dept_id:
+                from monitoring.models import Department
+                try:
+                    department = Department.objects.get(id=dept_id)
+                    validated_data['department'] = department
+                except Department.DoesNotExist:
+                    raise serializers.ValidationError({"departmentId": "Bo'lim topilmadi"})
+        
+        # ID generatsiya
+        if "id" not in validated_data:
+            name = validated_data.get("name", "room")
+            dept = validated_data.get("department")
+            dept_prefix = dept.id[:4] if dept else "rm"
+            validated_data["id"] = f"{dept_prefix}_{name.lower().replace(' ', '_')}"
+        
+        return super().create(validated_data)
 
 
 class BedSerializer(serializers.ModelSerializer):
-    roomId = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all(), source="room")
+    roomId = serializers.CharField(source="room.id", read_only=True)
 
     class Meta:
         model = Bed
         fields = ["id", "name", "roomId"]
+        extra_kwargs = {"id": {"required": False}}
+    
+    def create(self, validated_data):
+        # Room ni olish (frontend roomId yuboradi)
+        request = self.context.get('request')
+        if request and hasattr(request, 'data'):
+            room_id = request.data.get('roomId') or request.data.get('room_id')
+            if room_id:
+                from monitoring.models import Room
+                try:
+                    room = Room.objects.get(id=room_id)
+                    validated_data['room'] = room
+                except Room.DoesNotExist:
+                    raise serializers.ValidationError({"roomId": "Palata topilmadi"})
+        
+        # ID generatsiya
+        if "id" not in validated_data:
+            name = validated_data.get("name", "bed")
+            room = validated_data.get("room")
+            room_prefix = room.id[:4] if room else "bd"
+            validated_data["id"] = f"{room_prefix}_{name.lower().replace(' ', '_')}"
+        
+        return super().create(validated_data)
 
 
 class MonitorDeviceSerializer(serializers.ModelSerializer):
@@ -282,6 +335,21 @@ class MonitorDeviceSerializer(serializers.ModelSerializer):
             "lastHl7RxAtMs": instance.last_hl7_rx_at_ms,
             "hl7ConnectHandshake": instance.hl7_connect_handshake,
         }
+
+
+class PatientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Patient
+        fields = "__all__"
+        extra_kwargs = {"id": {"required": False}}
+
+    def create(self, validated_data):
+        if "id" not in validated_data:
+            import random
+            validated_data["id"] = "p" + str(random.randint(100000000, 999999999))
+        if "admission_date" not in validated_data:
+            validated_data["admission_date"] = int(time.time() * 1000)
+        return super().create(validated_data)
 
 
 class DeviceVitalsIngestSerializer(serializers.Serializer):

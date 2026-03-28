@@ -71,11 +71,11 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
   }, [nextCheckTime]);
 
   const alarmStyles = {
-    none: 'border-zinc-200 bg-white hover:bg-zinc-50 shadow-md shadow-zinc-200/50',
-    blue: 'border-blue-400 bg-blue-50 animate-pulse hover:bg-blue-100 shadow-md shadow-blue-100/80',
-    yellow: 'border-amber-400 bg-amber-50 animate-pulse hover:bg-amber-100 shadow-md shadow-amber-100/80',
-    red: 'border-red-500 bg-red-50 animate-pulse shadow-lg shadow-red-200/60 hover:bg-red-100',
-    purple: 'border-purple-500 bg-purple-50 animate-pulse shadow-lg shadow-purple-200/60 hover:bg-purple-100',
+    none: 'glass-card hover:bg-white/90 dark:hover:bg-zinc-800/90 shadow-sm',
+    blue: 'border-blue-400/50 bg-blue-50/50 dark:bg-blue-900/30 animate-pulse hover:bg-blue-100/60 shadow-md shadow-blue-500/10',
+    yellow: 'border-amber-400/50 bg-amber-50/50 dark:bg-amber-900/30 animate-pulse hover:bg-amber-100/60 shadow-md shadow-amber-500/10',
+    red: 'emergency-flash text-white shadow-2xl',
+    purple: 'border-purple-500/50 bg-purple-50/50 dark:bg-purple-900/40 animate-pulse shadow-xl shadow-purple-500/20 hover:bg-purple-100/60',
   };
 
   const maskedName = privacyMode
@@ -116,7 +116,7 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             <h3 className={cn(
-              "font-bold text-zinc-900 group-hover:text-emerald-800 transition-colors truncate",
+              "font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate",
               isSmall ? "text-[10px]" : isMedium ? "text-xs" : "text-sm"
             )}>
               {maskedName}
@@ -127,21 +127,21 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
               </div>
             )}
             {patient.isPinned && (
-              <Pin className="w-3 h-3 text-emerald-400 shrink-0 fill-emerald-400" />
+              <Pin className="w-3 h-3 text-emerald-500 shrink-0 fill-emerald-500" />
             )}
           </div>
           {!isSmall && (
             <div className="flex items-center space-x-1 mt-0.5">
-              <p className="text-[8px] text-zinc-700 font-mono bg-zinc-100 px-1 py-0.5 rounded truncate font-medium">{patient.room}</p>
+              <p className="text-[8px] text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded truncate font-medium">{patient.room}</p>
               {isLarge && (
-                <div className="flex items-center text-[9px] text-zinc-600 min-w-0" title="Mas'ul shifokor / Hamshira">
+                <div className="flex items-center text-[9px] text-zinc-600 dark:text-zinc-400 min-w-0" title="Mas'ul shifokor / Hamshira">
                   <UserCircle className="w-2.5 h-2.5 mr-1 shrink-0" />
                   <span className="truncate">{doctor} / {patient.assignedNurse}</span>
                 </div>
               )}
             </div>
           )}
-          {isSmall && <p className="text-[8px] text-zinc-600 truncate font-medium">{patient.room}</p>}
+          {isSmall && <p className="text-[8px] text-zinc-600 dark:text-zinc-400 truncate font-medium">{patient.room}</p>}
         </div>
         
         <div className="flex flex-col items-end space-y-0.5 ml-1 shrink-0 max-w-[50%]">

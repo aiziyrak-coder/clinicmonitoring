@@ -10,6 +10,7 @@
  *   GATEWAY_PORT=6006
  *   DEBUG=1  (set DEBUG=0 to reduce logs)
  *   NO_DATA_MS=10000
+ *   GATEWAY_TOKEN=your_secret_token
  */
 
 "use strict";
@@ -19,11 +20,38 @@ const http = require("http");
 const https = require("https");
 const { URL } = require("url");
 
+// ============================================
+// SOZLAMALAR
+// ============================================
+
 const GATEWAY_HOST = process.env.GATEWAY_HOST || "0.0.0.0";
 const GATEWAY_PORT = Number(process.env.GATEWAY_PORT || 6006);
-const VITALS_URL = process.env.VITALS_URL || "http://167.71.53.238/api/vitals";
-const NO_DATA_MS = Number(process.env.NO_DATA_MS || 10_000);
+const VITALS_URL = process.env.VITALS_URL || "";
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || "";
+const NO_DATA_MS = Number(process.env.NO_DATA_MS || 15_000);
 const DEBUG = process.env.DEBUG !== "0" && process.env.DEBUG !== "false";
+const RETRY_MAX_ATTEMPTS = Number(process.env.RETRY_MAX_ATTEMPTS || 10);
+const RETRY_INITIAL_DELAY_MS = Number(process.env.RETRY_INITIAL_DELAY_MS || 1000);
+const HL7_RECV_TIMEOUT_MS = Number(process.env.HL7_RECV_TIMEOUT_MS || 5000);
+
+// Sozlamalarni tekshirish
+if (!VITALS_URL) {
+  console.error("[FATAL] VITALS_URL sozlanmagan! Muhit o'zgaruvchisini tekshiring.");
+  console.error("Misol: VITALS_URL=http://192.168.1.10:8000/api/vitals/");
+  process.exit(1);
+}
+
+console.log("[INFO] ==========================================");
+console.log("[INFO] HL7 Gateway ishga tushmoqda...");
+console.log(`[INFO] TCP Port: ${GATEWAY_HOST}:${GATEWAY_PORT}`);
+console.log(`[INFO] Backend URL: ${VITALS_URL}`);
+console.log(`[INFO] Debug mode: ${DEBUG}`);
+console.log(`[INFO] No-data timeout: ${NO_DATA_MS}ms`);
+console.log("[INFO] ==========================================");
+
+// ============================================
+// YORDAMCHI FUNKSIYALAR
+// ============================================
 
 const NIBP_RE = /^(\d{2,3})\s*\/\s*(\d{2,3})$/;
 const NUMERIC = /^\d+(\.\d+)?$/;
@@ -36,6 +64,14 @@ function debug(msg, ...rest) {
   if (DEBUG) log(`[DEBUG] ${msg}`, ...rest);
 }
 
+function error(msg, ...rest) {
+  console.error(new Date().toISOString(), `[ERROR] ${msg}`, ...rest);
+}
+
+function warn(msg, ...rest) {
+  console.warn(new Date().toISOString(), `[WARN] ${msg}`, ...rest);
+}
+
 /** Normalize socket remote address for device_id */
 function peerDeviceId(socket) {
   let ip = socket.remoteAddress || "unknown";
@@ -43,32 +79,50 @@ function peerDeviceId(socket) {
   return ip;
 }
 
-// --- HL7 parsing (OBX-focused, same ideas as clinical monitors) ---
+/** Xatolikni log qilish */
+function logError(context, err, extra = {}) {
+  error(`${context}: ${err.message}`, extra);
+  if (DEBUG && err.stack) {
+    debug(`Stack: ${err.stack}`);
+  }
+}
+
+// ============================================
+// HL7 PARSING
+// ============================================
 
 function classifyObx3(obx3) {
   const blob = String(obx3 || "")
     .toLowerCase()
     .replace(/\|/g, " ");
+  
   if (
-    /чсс|чпс|пульс|heart|pulse|\bhr\b|8867|mdc.*hr|mdc.*heart/.test(blob)
+    /чсс|чпс|пульс|heart|pulse|\bhr\b|pulse rate|8867|mdc.*hr|mdc.*heart|ecg.*rate/.test(blob)
   ) {
     return "hr";
   }
-  if (/spo2|2708|oxygen|сатурац|mdc.*spo2/.test(blob)) return "spo2";
-  if (/8310|temp|temperature/.test(blob)) return "temp";
-  if (/9279|respiratory|\brr\b/.test(blob)) return "rr";
-  if (/nibp|blood pressure|n_bp|\bbp\b/.test(blob)) return "nibp_combined";
+  if (/spo2|2708|oxygen|сатурац|sao2|o2 sat|mdc.*spo2|pulse.*ox/.test(blob)) return "spo2";
+  if (/8310|temp|temperature|body temp|t1|t2|tblood|mdc.*temp/.test(blob)) return "temp";
+  if (/9279|respiratory|\brr\b|resp rate|br|breath|mdc.*resp/.test(blob)) return "rr";
+  if (/nibp|blood pressure|n_bp|\bbp\b|pressure|sys|dia|map|mdc.*bp|mdc.*pressure/.test(blob)) return "nibp_combined";
   return null;
 }
 
 function extractObxValue(parts) {
-  for (let i = 5; i < Math.min(parts.length, 25); i++) {
+  for (let i = 5; i < Math.min(parts.length, 30); i++) {
     const raw = (parts[i] || "").trim();
     if (!raw) continue;
     const first = raw.split("^")[0].trim();
     if (NIBP_RE.test(first.replace(/\s/g, ""))) return first;
     if (NUMERIC.test(first.replace(",", "."))) return first;
     if (/\d{2,3}\s*\/\s*\d{2,3}/.test(first)) return first;
+    if (raw.includes("^")) {
+      const components = raw.split("^");
+      for (const comp of components) {
+        const c = comp.trim();
+        if (NUMERIC.test(c.replace(",", "."))) return c;
+      }
+    }
   }
   return (parts[5] || "").trim();
 }
@@ -80,27 +134,26 @@ function parseFloatSafe(s) {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * Parse HL7 text; returns vitals object (snake_case for API).
- */
 function parseHl7Message(hl7Text) {
   const text = hl7Text.replace(/\r\n/g, "\r").replace(/\n/g, "\r");
   const lines = text.split("\r").map((l) => l.trim()).filter(Boolean);
 
-  /** @type {Record<string, number | undefined>} */
   const out = {};
   let msh = "";
   let obr = "";
+  let obxCount = 0;
 
   for (const line of lines) {
     const up = line.toUpperCase();
     if (up.startsWith("MSH|")) msh = line;
     if (up.startsWith("PID|")) {
-      /* reserved for future patient id */
+      // reserved
     }
     if (up.startsWith("OBR|")) obr = line;
 
     if (!up.startsWith("OBX|")) continue;
+    
+    obxCount++;
     const parts = line.split("|");
     const obx3 = parts[3] || "";
     const value = extractObxValue(parts);
@@ -110,12 +163,15 @@ function parseHl7Message(hl7Text) {
       const fv = parseFloatSafe(value);
       if (fv !== null) {
         const v = Math.round(fv);
-        if ((v >= 35 && v <= 220) || (v >= 70 && v <= 100)) {
-          if (v >= 85 && v <= 100 && out.spo2 === undefined) kind = "spo2";
-          else if (out.hr === undefined && v >= 35 && v <= 220) kind = "hr";
+        if (v >= 85 && v <= 100 && out.spo2 === undefined) {
+          kind = "spo2";
+        }
+        else if (v >= 35 && v <= 220 && out.heart_rate === undefined) {
+          kind = "hr";
         }
       }
     }
+    
     if (!kind) continue;
 
     if (kind === "nibp_combined") {
@@ -126,13 +182,22 @@ function parseHl7Message(hl7Text) {
       }
       continue;
     }
+    
     const fv = parseFloatSafe(value);
     if (fv === null) continue;
+    
     if (kind === "hr") out.heart_rate = Math.round(fv);
     else if (kind === "spo2") out.spo2 = Math.round(fv);
     else if (kind === "temp") out.temperature = Math.round(fv * 10) / 10;
     else if (kind === "rr") out.rr = Math.round(fv);
   }
+
+  debug(`Parsed ${obxCount} OBX segments, vitals:`, {
+    hr: out.heart_rate,
+    spo2: out.spo2,
+    sys: out.systolic,
+    dia: out.diastolic
+  });
 
   return {
     heart_rate: out.heart_rate,
@@ -141,13 +206,14 @@ function parseHl7Message(hl7Text) {
     diastolic: out.diastolic,
     temperature: out.temperature,
     rr: out.rr,
-    _meta: { msh: msh.slice(0, 80), obr: obr.slice(0, 80) },
+    _meta: { msh: msh.slice(0, 80), obr: obr.slice(0, 80), obxCount },
   };
 }
 
-/**
- * Extract all complete MLLP frames from buffer; return { frames, rest }.
- */
+// ============================================
+// MLLP FRAME HANDLING
+// ============================================
+
 function extractMllpFrames(buf) {
   const frames = [];
   let i = 0;
@@ -157,13 +223,20 @@ function extractMllpFrames(buf) {
     i = hb;
     const fs = buf.indexOf(0x1c, i + 1);
     if (fs === -1) return { frames, rest: buf.subarray(i) };
-    frames.push(buf.subarray(i + 1, fs).toString("utf8"));
-    i = fs + 1;
-    if (i < buf.length && buf[i] === 0x0d) i++;
+    
+    const endPos = fs + 1;
+    if (endPos < buf.length && buf[endPos] === 0x0d) {
+      frames.push(buf.subarray(i + 1, fs).toString("utf8"));
+      i = endPos + 1;
+    } else if (endPos < buf.length && buf[endPos] === 0x0a) {
+      frames.push(buf.subarray(i + 1, fs).toString("utf8"));
+      i = endPos + 1;
+    } else {
+      return { frames, rest: buf.subarray(i) };
+    }
   }
 }
 
-/** Non-MLLP: messages starting with MSH| split by \r(?=MSH) */
 function extractBareMshBlocks(str) {
   const s = str.replace(/\r\n/g, "\r").replace(/\n/g, "\r");
   return s
@@ -172,12 +245,17 @@ function extractBareMshBlocks(str) {
     .filter((x) => /^MSH\|/i.test(x));
 }
 
-function httpPostJson(urlStr, body) {
+// ============================================
+// HTTP CLIENT
+// ============================================
+
+function httpPostJson(urlStr, body, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const isHttps = u.protocol === "https:";
     const lib = isHttps ? https : http;
     const payload = JSON.stringify(body);
+    
     const opts = {
       hostname: u.hostname,
       port: u.port || (isHttps ? 443 : 80),
@@ -187,26 +265,44 @@ function httpPostJson(urlStr, body) {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(payload, "utf8"),
       },
-      timeout: 30_000,
+      timeout: timeoutMs,
     };
+    
+    if (GATEWAY_TOKEN) {
+      opts.headers["X-Gateway-Token"] = GATEWAY_TOKEN;
+    }
+    
+    debug(`HTTP POST to ${urlStr}, payload:`, body);
+    
     const req = lib.request(opts, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));
       res.on("end", () => {
+        const responseBody = Buffer.concat(chunks).toString("utf8");
+        debug(`HTTP Response ${res.statusCode}:`, responseBody.slice(0, 500));
         resolve({
           status: res.statusCode || 0,
-          body: Buffer.concat(chunks).toString("utf8"),
+          body: responseBody,
         });
       });
     });
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy(new Error("timeout"));
+    
+    req.on("error", (err) => {
+      reject(new Error(`HTTP request failed: ${err.message}`));
     });
+    
+    req.on("timeout", () => {
+      req.destroy(new Error("HTTP request timeout"));
+    });
+    
     req.write(payload);
     req.end();
   });
 }
+
+// ============================================
+// VITALS FORWARDING
+// ============================================
 
 async function forwardToServer(deviceId, vitals) {
   const timestamp = new Date().toISOString();
@@ -218,40 +314,84 @@ async function forwardToServer(deviceId, vitals) {
     systolic: vitals.systolic ?? null,
     diastolic: vitals.diastolic ?? null,
   };
+  
   if (vitals.temperature != null) payload.temperature = vitals.temperature;
+  if (vitals.rr != null) payload.rr = vitals.rr;
 
   let attempt = 0;
-  let delay = 1000;
-  const maxAttempts = 8;
+  let delay = RETRY_INITIAL_DELAY_MS;
 
-  while (attempt < maxAttempts) {
+  while (attempt < RETRY_MAX_ATTEMPTS) {
+    attempt++;
+    
     try {
       const res = await httpPostJson(VITALS_URL, payload);
+      
       if (res.status >= 200 && res.status < 300) {
-        console.log("FORWARDED TO SERVER", deviceId, "HTTP", res.status);
-        return;
+        log(`[SUCCESS] Vitals forwarded: ${deviceId} (HTTP ${res.status})`);
+        
+        try {
+          const responseData = JSON.parse(res.body);
+          if (responseData.success) {
+            debug(`Backend response:`, responseData);
+          } else if (responseData.error) {
+            warn(`Backend returned error: ${responseData.error}`);
+            if (responseData.hint) {
+              warn(`Hint: ${responseData.hint}`);
+            }
+          }
+        } catch (e) {
+          // JSON emas
+        }
+        
+        return { success: true, attempt };
       }
-      log(`[WARN] Forward HTTP ${res.status} body=${res.body.slice(0, 200)}`);
+      
+      if (res.status === 404) {
+        warn(`Device not found in backend: ${deviceId}`);
+        warn(`Response: ${res.body.slice(0, 200)}`);
+        delay = 2000;
+      }
+      else if (res.status === 400) {
+        warn(`Bad request to backend: ${res.body.slice(0, 200)}`);
+        return { success: false, error: "Bad request", status: res.status };
+      }
+      else if (res.status === 401) {
+        error(`Authentication failed - check GATEWAY_TOKEN`);
+        return { success: false, error: "Authentication failed", status: res.status };
+      }
+      else {
+        warn(`HTTP ${res.status}: ${res.body.slice(0, 200)}`);
+      }
+      
     } catch (e) {
-      log(`[WARN] Forward error: ${e.message}`);
+      logError(`Forward attempt ${attempt} failed`, e);
     }
-    attempt++;
-    log(`[WARN] Retry ${attempt}/${maxAttempts} in ${delay}ms`);
-    await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(delay * 2, 30_000);
+    
+    if (attempt < RETRY_MAX_ATTEMPTS) {
+      warn(`[RETRY] Attempt ${attempt}/${RETRY_MAX_ATTEMPTS} failed, retrying in ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 1.5, 30000);
+    }
   }
-  log(`[ERROR] Forward failed after ${maxAttempts} attempts for ${deviceId}`);
+  
+  error(`[FAILED] Forward failed after ${RETRY_MAX_ATTEMPTS} attempts for ${deviceId}`);
+  return { success: false, error: "Max retries exceeded" };
 }
+
+// ============================================
+// TCP CONNECTION HANDLER
+// ============================================
 
 function handleConnection(socket) {
   const deviceId = peerDeviceId(socket);
   const peer = `${socket.remoteAddress}:${socket.remotePort}`;
-  console.log("CLIENT CONNECTED", deviceId, peer);
+  log(`[CONNECT] Client connected: ${deviceId} (${peer})`);
 
   let buf = Buffer.alloc(0);
   let noDataTimer = setTimeout(() => {
-    console.log("NO DATA RECEIVED");
-    debug(`NO DATA (${NO_DATA_MS}ms) peer=${peer}`);
+    warn(`[TIMEOUT] No data received from ${deviceId} within ${NO_DATA_MS}ms`);
+    socket.end();
   }, NO_DATA_MS);
 
   const clearNoData = () => {
@@ -261,28 +401,48 @@ function handleConnection(socket) {
     }
   };
 
+  socket.setKeepAlive(true, 60000);
+  socket.setNoDelay(true);
+
   socket.on("data", (chunk) => {
     clearNoData();
-    log(`RAW TCP len=${chunk.length} from peer=${peer} hex=${chunk.toString("hex").slice(0, 128)}`);
+    
+    debug(`RAW TCP from ${deviceId}: len=${chunk.length}, hex=${chunk.toString("hex").slice(0, 128)}`);
+    
     buf = Buffer.concat([buf, chunk]);
 
     const mllp = extractMllpFrames(buf);
     buf = mllp.rest;
+    
     for (const frame of mllp.frames) {
-      if (!/MSH\|/i.test(frame)) continue;
-      console.log("HL7 RECEIVED");
-      debug("HL7 MLLP payload preview:", frame.slice(0, 200));
-      const vit = parseHl7Message(frame);
-      const hasAny =
-        vit.heart_rate != null ||
-        vit.spo2 != null ||
-        vit.systolic != null ||
-        vit.diastolic != null ||
-        vit.temperature != null;
-      if (!hasAny) {
-        log(`[INFO] HL7 parsed but no vitals (OBX empty?): ${deviceId}`);
+      if (!/MSH\|/i.test(frame)) {
+        debug(`Skipping non-MSH frame from ${deviceId}`);
+        continue;
       }
-      forwardToServer(deviceId, vit).catch((e) => log("[ERROR] forward", e.message));
+      
+      log(`[HL7-MLLP] Message received from ${deviceId}`);
+      debug(`HL7 content preview:`, frame.slice(0, 300));
+      
+      try {
+        const vit = parseHl7Message(frame);
+        const hasAny =
+          vit.heart_rate != null ||
+          vit.spo2 != null ||
+          vit.systolic != null ||
+          vit.diastolic != null ||
+          vit.temperature != null ||
+          vit.rr != null;
+          
+        if (!hasAny) {
+          warn(`[PARSE] HL7 parsed but no vitals found from ${deviceId}`);
+          debug(`Full frame:`, frame);
+        } else {
+          log(`[PARSE] Vitals extracted: HR=${vit.heart_rate}, SpO2=${vit.spo2}, BP=${vit.systolic}/${vit.diastolic}`);
+          forwardToServer(deviceId, vit).catch((e) => logError("Forward failed", e));
+        }
+      } catch (e) {
+        logError(`Parse error from ${deviceId}`, e);
+      }
     }
 
     const tail = buf.toString("utf8");
@@ -291,35 +451,92 @@ function handleConnection(socket) {
       if (blocks.length) {
         buf = Buffer.alloc(0);
         for (const block of blocks) {
-          console.log("HL7 RECEIVED");
-          debug("HL7 bare preview:", block.slice(0, 200));
-          const vit = parseHl7Message(block);
-          forwardToServer(deviceId, vit).catch((e) => log("[ERROR] forward", e.message));
+          log(`[HL7-BARE] Message received from ${deviceId}`);
+          debug(`HL7 bare preview:`, block.slice(0, 300));
+          
+          try {
+            const vit = parseHl7Message(block);
+            forwardToServer(deviceId, vit).catch((e) => logError("Forward failed", e));
+          } catch (e) {
+            logError(`Parse error from ${deviceId}`, e);
+          }
         }
       }
+    }
+    
+    if (buf.length > 10 * 1024 * 1024) {
+      warn(`[BUFFER] Buffer too large (${buf.length} bytes), clearing`);
+      buf = Buffer.alloc(0);
     }
   });
 
   socket.on("close", (hadError) => {
     clearNoData();
-    log(`TCP CLOSED peer=${peer} hadError=${hadError}`);
+    if (hadError) {
+      warn(`[DISCONNECT] ${deviceId} closed with error`);
+    } else {
+      log(`[DISCONNECT] ${deviceId} closed normally`);
+    }
   });
 
   socket.on("error", (err) => {
     clearNoData();
-    log(`TCP ERROR peer=${peer} ${err.message}`);
+    logError(`Socket error for ${deviceId}`, err);
   });
+
+  socket.on("timeout", () => {
+    warn(`[TIMEOUT] Socket timeout for ${deviceId}`);
+    socket.end();
+  });
+  
+  socket.setTimeout(HL7_RECV_TIMEOUT_MS);
 }
+
+// ============================================
+// SERVER START
+// ============================================
 
 const server = net.createServer(handleConnection);
 
 server.on("error", (err) => {
-  log("[FATAL] TCP server error:", err.message);
+  if (err.code === "EADDRINUSE") {
+    error(`[FATAL] Port ${GATEWAY_PORT} is already in use!`);
+    error(`Another gateway or HL7 server may be running.`);
+  } else {
+    error(`[FATAL] TCP server error:`, err);
+  }
   process.exit(1);
 });
 
 server.listen(GATEWAY_PORT, GATEWAY_HOST, () => {
-  log(`HL7 Gateway listening on ${GATEWAY_HOST}:${GATEWAY_PORT}`);
-  log(`Forward URL: ${VITALS_URL}`);
-  log(`DEBUG=${DEBUG} NO_DATA_MS=${NO_DATA_MS}`);
+  log(`[STARTED] HL7 Gateway listening on ${GATEWAY_HOST}:${GATEWAY_PORT}`);
+  log(`[STARTED] Forward URL: ${VITALS_URL}`);
+  log(`[STARTED] DEBUG=${DEBUG} NO_DATA_MS=${NO_DATA_MS}`);
+  log(`[STARTED] RETRY_MAX_ATTEMPTS=${RETRY_MAX_ATTEMPTS}`);
+});
+
+process.on("SIGINT", () => {
+  log("[SHUTDOWN] SIGINT received, closing server...");
+  server.close(() => {
+    log("[SHUTDOWN] Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGTERM", () => {
+  log("[SHUTDOWN] SIGTERM received, closing server...");
+  server.close(() => {
+    log("[SHUTDOWN] Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("uncaughtException", (err) => {
+  error("[FATAL] Uncaught exception:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  error("[FATAL] Unhandled rejection at:", promise, "reason:", reason);
+  process.exit(1);
 });

@@ -40,7 +40,14 @@ def resolve_hl7_device_by_peer_ip(
     Loopback (127.0.0.1) uchun NAT fallback odatda o'chiq — aks holda probe/texshiruv bitta
     qurilmani noto'g'ri «onlayn» qiladi va hl7_peer_ip=127.0.0.1 yozadi.
     Mahalliy HL7 sinovi uchun: allow_nat_loopback=True (faqat haqiqiy HL7 paket yo'lda).
+    
+    Yangi: Gateway orqali kelgan so'rovlar uchun IP subnet bo'yicha qidirish.
     """
+    if not peer_ip or peer_ip == "unknown":
+        logger.warning("HL7: Noto'g'ri peer_ip: %s", peer_ip)
+        return None
+    
+    # 1. To'g'ri mos keluvchi IP larni qidirish
     dev = (
         MonitorDevice.objects.filter(hl7_enabled=True)
         .filter(
@@ -51,31 +58,75 @@ def resolve_hl7_device_by_peer_ip(
         .first()
     )
     if dev:
+        logger.info("HL7: Qurilma to'g'ri IP moslashuvi bilan topildi: %s (peer=%s)", dev.id, peer_ip)
         return dev
 
+    # 2. Loopback tekshiruvi
     if is_loopback_peer_ip(peer_ip) and not allow_nat_loopback:
+        logger.debug("HL7: Loopback IP o'tkazib yuborildi (allow_nat_loopback=%s)", allow_nat_loopback)
         return None
 
+    # 3. Subnet bo'yicha qidirish (masalan, 192.168.1.x)
+    # Agar peer_ip 192.168.1.100 bo'lsa, 192.168.1. bilan boshlanuvchi barcha IP larni qidirish
+    peer_parts = peer_ip.split(".")
+    if len(peer_parts) == 4:
+        subnet = ".".join(peer_parts[:3])  # masalan: 192.168.1
+        
+        # Bir xil subnetdagi qurilmalarni qidirish
+        subnet_devices = MonitorDevice.objects.filter(
+            hl7_enabled=True
+        ).filter(
+            Q(ip_address__startswith=subnet + ".")
+            | Q(local_ip__startswith=subnet + ".")
+            | Q(hl7_peer_ip__startswith=subnet + ".")
+        )
+        
+        if subnet_devices.count() == 1:
+            dev = subnet_devices.first()
+            logger.info(
+                "HL7: Subnet moslashuvi bilan topildi: %s (peer=%s, subnet=%s)",
+                dev.id, peer_ip, subnet
+            )
+            # IP ni saqlash
+            if dev.hl7_peer_ip != peer_ip:
+                dev.hl7_peer_ip = peer_ip
+                dev.save(update_fields=["hl7_peer_ip"])
+            return dev
+
+    # 4. NAT fallback - faqat bitta qurilma bo'lsa
     en = os.environ.get("HL7_NAT_SINGLE_DEVICE_FALLBACK", "true").lower()
     if en not in ("1", "true", "yes", "on"):
         return None
 
     qs = MonitorDevice.objects.filter(hl7_enabled=True)
-    if qs.count() != 1:
+    count = qs.count()
+    
+    if count == 0:
+        logger.warning("HL7: Hech qanday HL7-enabled qurilma topilmadi")
         return None
-
-    only = qs.first()
-    assert only is not None
-    logger.info(
-        "HL7: NAT — peer=%s bitta yoqilgan qurilma %s bilan biriktirildi (local_ip=%s)",
-        peer_ip,
-        only.id,
-        only.local_ip or only.ip_address,
+    
+    if count == 1:
+        only = qs.first()
+        assert only is not None
+        logger.info(
+            "HL7: NAT — peer=%s bitta yoqilgan qurilma %s bilan biriktirildi (local_ip=%s)",
+            peer_ip,
+            only.id,
+            only.local_ip or only.ip_address,
+        )
+        if only.hl7_peer_ip != peer_ip:
+            only.hl7_peer_ip = peer_ip
+            only.save(update_fields=["hl7_peer_ip"])
+        return only
+    
+    # Bir nechta qurilmalar bo'lsa, log qilish
+    logger.warning(
+        "HL7: peer=%s uchun %d ta qurilma topildi, aniq birini tanlab bo'lmadi. "
+        "Qurilmani aniq IP bilan sozlang yoki HL7_NAT_SINGLE_DEVICE_FALLBACK=true qiling. "
+        "Topilgan ID lar: %s",
+        peer_ip, count, list(qs.values_list("id", flat=True))
     )
-    if only.hl7_peer_ip != peer_ip:
-        only.hl7_peer_ip = peer_ip
-        only.save(update_fields=["hl7_peer_ip"])
-    return only
+    return None
 
 
 def _row_for_patient(p: Patient, history_override: list[dict[str, Any]] | None = None) -> dict[str, Any]:

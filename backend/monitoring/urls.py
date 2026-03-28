@@ -8,6 +8,7 @@ router.register(r"departments", views.DepartmentViewSet, basename="department")
 router.register(r"rooms", views.RoomViewSet, basename="room")
 router.register(r"beds", views.BedViewSet, basename="bed")
 router.register(r"devices", views.DeviceViewSet, basename="device")
+router.register(r"patients-crud", views.PatientViewSet, basename="patient-crud")
 
 urlpatterns = [
     path("auth/session/", auth_views.auth_session),
@@ -21,4 +22,7 @@ urlpatterns = [
     path("health/", views.health),
     path("hl7/", views.hl7_bridge_ingest),
     path("device/<str:ip>/vitals/", views.device_vitals_ingest),
+    # Gateway uchun vitals endpoint (device_id + IP orqali)
+    path("vitals/", views.gateway_vitals_ingest),
+    path("simulate-vitals/", views.SimulateVitalsView.as_view(), name="simulate-vitals"),
 ]

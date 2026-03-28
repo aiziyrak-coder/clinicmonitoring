@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -28,6 +29,7 @@ def auth_session(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt  # DRF + Django session authentication uchun CSRF exempt
 def auth_login(request):
     username = (request.data.get("username") or "").strip()
     password = request.data.get("password") or ""
@@ -35,7 +37,7 @@ def auth_login(request):
     if user is None:
         return Response(
             {"detail": "Login yoki parol noto'g'ri."},
-            status=status.HTTP_400_BAD_REQUEST,
+            status=status.HTTP_401_UNAUTHORIZED,
         )
     login(request, user)
     clinic = get_clinic_for_user(user)
@@ -44,7 +46,8 @@ def auth_login(request):
             "success": True,
             "username": user.username,
             "clinic": {"id": clinic.id, "name": clinic.name} if clinic else None,
-        }
+        },
+        status=status.HTTP_200_OK,
     )
 
 

@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
 from monitoring.clinic_scope import get_clinic_for_user
-from monitoring.models import Department, MonitorDevice
+from monitoring.models import Clinic, Department, MonitorDevice
 
 
 class ClinicScopedViewSetMixin:
@@ -31,10 +31,15 @@ class ClinicScopedViewSetMixin:
         model = qs.model
         if model is Department:
             return qs.filter(clinic=c)
-        if model is Room:
+        if hasattr(model, "department"):
             return qs.filter(department__clinic=c)
-        if model is Bed:
+        if hasattr(model, "room"):
             return qs.filter(room__department__clinic=c)
+        if hasattr(model, "bed"):
+            return qs.filter(bed__room__department__clinic=c)
+        if model is Patient:
+            # Endi Patient to'g'ridan-to'g'ri clinicga ega
+            return qs.filter(clinic=c)
         if model is MonitorDevice:
             return qs.filter(clinic=c)
         return qs
@@ -49,18 +54,73 @@ class ClinicScopedViewSetMixin:
         return ctx
 
     def perform_create(self, serializer):
+        """Create object with automatic clinic assignment."""
         user = self.request.user
+        
+        # Determine clinic for assignment
         if user.is_superuser:
+            c = get_clinic_for_user(user)
+            if not c:
+                c = Clinic.objects.first()
+        else:
+            c = get_clinic_for_user(user)
+            if not c:
+                raise PermissionDenied("Klinika profili topilmadi.")
+        
+        from monitoring.models import Department, MonitorDevice, Room, Bed, Patient
+        model = serializer.Meta.model
+        
+        # 1. Department & MonitorDevice (Directly linked to Clinic)
+        if model in (Department, MonitorDevice):
+            if "clinic" not in serializer.validated_data and c:
+                serializer.save(clinic=c)
+            else:
+                serializer.save()
+            return
+        
+        # 2. Patient (Needs clinic + optional bed)
+        if model is Patient:
+            extra = {}
+            if "clinic" not in serializer.validated_data and c:
+                extra["clinic"] = c
+            
+            if "bed" not in serializer.validated_data:
+                bed_id = self.request.data.get("bedId") or self.request.data.get("bed_id")
+                if bed_id:
+                    try:
+                        extra["bed"] = Bed.objects.get(id=bed_id)
+                    except Bed.DoesNotExist:
+                        pass
+            serializer.save(**extra)
+            return
+
+        # 3. Room (Linked to Department)
+        if model is Room:
+            if "department" not in serializer.validated_data:
+                dept_id = self.request.data.get("departmentId") or self.request.data.get("department_id")
+                if dept_id:
+                    try:
+                        serializer.save(department=Department.objects.get(id=dept_id))
+                        return
+                    except Department.DoesNotExist:
+                        from rest_framework import serializers
+                        raise serializers.ValidationError({"departmentId": "Department not found"})
             serializer.save()
             return
-        c = get_clinic_for_user(user)
-        if not c:
-            raise PermissionDenied("Klinika profili topilmadi.")
-        m = serializer.Meta.model
-        if m is Department:
-            serializer.save(clinic=c)
+        
+        # 4. Bed (Linked to Room)
+        if model is Bed:
+            if "room" not in serializer.validated_data:
+                room_id = self.request.data.get("roomId") or self.request.data.get("room_id")
+                if room_id:
+                    try:
+                        serializer.save(room=Room.objects.get(id=room_id))
+                        return
+                    except Room.DoesNotExist:
+                        from rest_framework import serializers
+                        raise serializers.ValidationError({"roomId": "Room not found"})
+            serializer.save()
             return
-        if m is MonitorDevice:
-            serializer.save(clinic=c)
-            return
+        
+        # Default
         serializer.save()

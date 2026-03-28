@@ -21,6 +21,8 @@ interface InfraBed {
 
 export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
   const admitPatient = useStore((state) => state.admitPatient);
+  const errorMessage = useStore((state) => state.errorMessage);
+  const setErrorMessage = useStore((state) => state.setErrorMessage);
   useModalDismiss(true, onClose);
 
   const [departments, setDepartments] = useState<InfraDepartment[]>([]);
@@ -134,6 +136,18 @@ export function AdmitPatientModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {errorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm font-medium flex items-center justify-between">
+              <span>{errorMessage}</span>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="ml-2 text-red-600 hover:text-red-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm font-medium">
               {error}

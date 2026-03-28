@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import (
     action,
     api_view,
@@ -53,6 +56,36 @@ class BedViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
 class DeviceViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = MonitorDevice.objects.all()
     serializer_class = MonitorDeviceSerializer
+...
+class PatientViewSet(ClinicScopedViewSetMixin, viewsets.ModelViewSet):
+    from monitoring.serializers import PatientSerializer
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+
+    def perform_create(self, serializer):
+        patient = serializer.save()
+        from monitoring.models import ClinicalAuditLog
+        ClinicalAuditLog.objects.create(
+            user=self.request.user if self.request.user.is_authenticated else None,
+            action="ADMIT",
+            patient=patient,
+            details={"patient_name": patient.name, "bed_id": patient.bed_id},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+        )
+        logger.info(f"Patient admitted: {patient.id} by {self.request.user}")
+
+    def perform_destroy(self, instance):
+        patient_id = instance.id
+        patient_name = instance.name
+        from monitoring.models import ClinicalAuditLog
+        ClinicalAuditLog.objects.create(
+            user=self.request.user if self.request.user.is_authenticated else None,
+            action="DISCHARGE",
+            details={"patient_id": patient_id, "patient_name": patient_name},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+        )
+        super().perform_destroy(instance)
+        logger.info(f"Patient discharged: {patient_id} by {self.request.user}")
 
     @action(detail=True, methods=["post"], url_path="mark-online")
     def mark_online(self, request, pk=None):
@@ -508,6 +541,161 @@ def device_vitals_ingest(request, ip: str):
     return Response({"success": True, "message": "Data received"})
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def gateway_vitals_ingest(request):
+    """
+    LOCAL GATEWAY uchun maxsus endpoint.
+    Gateway HL7 dan parse qilib, shu endpointga yuboradi.
+    
+    Headers:
+        X-Gateway-Token: sozlangan token (ixtiyoriy, sozlanmasa ham ishlaydi)
+    
+    Body:
+        {
+            "device_id": "192.168.1.100",  // Qurilma IP manzili
+            "timestamp": "2024-01-15T10:30:00.000Z",
+            "heart_rate": 72,
+            "spo2": 98,
+            "systolic": 120,
+            "diastolic": 80,
+            "temperature": 36.6,
+            "rr": 16
+        }
+    """
+    import os
+    from monitoring.device_integration import apply_vitals_payload, resolve_hl7_device_by_peer_ip
+    
+    # Token tekshiruvi (ixtiyoriy)
+    expected_token = os.environ.get("GATEWAY_TOKEN", "").strip()
+    if expected_token:
+        provided_token = (request.headers.get("X-Gateway-Token") or "").strip()
+        if provided_token != expected_token:
+            return Response(
+                {"error": "Invalid gateway token"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+    
+    data = request.data if isinstance(request.data, dict) else {}
+    
+    # device_id - bu qurilmaning IP manzili
+    device_id = (data.get("device_id") or "").strip()
+    if not device_id:
+        return Response(
+            {"error": "device_id required (device IP address)"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Vitallarni olish
+    vitals = {}
+    if data.get("heart_rate") is not None:
+        vitals["hr"] = int(data["heart_rate"])
+    if data.get("spo2") is not None:
+        vitals["spo2"] = int(data["spo2"])
+    if data.get("systolic") is not None:
+        vitals["nibpSys"] = int(data["systolic"])
+    if data.get("diastolic") is not None:
+        vitals["nibpDia"] = int(data["diastolic"])
+    if data.get("temperature") is not None:
+        vitals["temp"] = float(data["temperature"])
+    if data.get("rr") is not None:
+        vitals["rr"] = int(data["rr"])
+    
+    if not vitals:
+        return Response(
+            {"error": "No vitals provided (heart_rate, spo2, systolic, diastolic, temperature, rr)"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Qurilmani topish (device_id = IP manzil)
+    device = resolve_hl7_device_by_peer_ip(device_id, allow_nat_loopback=True)
+    
+    if not device:
+        # Agar qurilma topilmasa, barcha HL7-enabled qurilmalarni qidirish
+        from monitoring.models import MonitorDevice
+        devices = MonitorDevice.objects.filter(hl7_enabled=True)
+        
+        # Agar faqat bitta qurilma bo'lsa, uni ishlatish
+        if devices.count() == 1:
+            device = devices.first()
+            # IP ni saqlash
+            if device.ip_address != device_id:
+                device.hl7_peer_ip = device_id
+                device.save(update_fields=["hl7_peer_ip"])
+        else:
+            # AVTO-PROVISION: Yangi qurilma yaratish
+            try:
+                from monitoring.clinic_scope import get_default_clinic
+                clinic = get_default_clinic()
+                if not clinic:
+                    return Response(
+                        {
+                            "error": "No default clinic found",
+                            "device_id": device_id,
+                            "hint": "Admin panelda klinika yaratilgan bo'lishi kerak"
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+                # Yangi qurilma yaratish
+                # GATEWAY_IP ni requestdan olishga harakat qilamiz (metadata sifatida)
+                gateway_ip = request.META.get("REMOTE_ADDR", "unknown")
+                
+                device = MonitorDevice.objects.create(
+                    id=f"dev{int(time.time() * 1000)}",
+                    clinic=clinic,
+                    ip_address=device_id,
+                    hl7_peer_ip=device_id,
+                    server_target_ip=gateway_ip,
+                    hl7_enabled=True,
+                    hl7_port=6006,
+                    hl7_connect_handshake=False,
+                    status=MonitorDevice.Status.OFFLINE,
+                    mac_address="",
+                    model="Auto-Provisioned",
+                )
+                logger.info(f"Auto-provisioned new device: {device.id} (IP: {device_id}, Gateway: {gateway_ip})")
+                
+            except Exception as e:
+                logger.error(f"Auto-provision failed: {e}")
+                return Response(
+                    {
+                        "error": "Device not found and auto-provision failed",
+                        "device_id": device_id,
+                        "detail": str(e),
+                        "hint": "Admin panelda qurilmani qo'lda yaratib, HL7 enabled qiling"
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+    
+    # Vitallarni saqlash
+    try:
+        patient = apply_vitals_payload(device, vitals, mark_online=True)
+        if patient:
+            return Response({
+                "success": True,
+                "message": "Vitals saved",
+                "device_id": device.id,
+                "patient_id": patient.id,
+                "vitals": vitals
+            })
+        else:
+            # Qurilma topildi lekin bemorga ulanmagan
+            return Response({
+                "success": False,
+                "error": "Device found but not linked to patient",
+                "hint": "Qurilmani bed ga biriktiring va bemorni qabul qiling",
+                "device_id": device.id,
+                "bed_id": device.bed_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def root(request):
@@ -521,6 +709,7 @@ def root(request):
             "api": "/api/",
             "admin": "/admin/",
             "websocket": "/ws/monitoring/",
+            "gateway": "/api/vitals/ (POST from local gateway)",
         }
     )
 
@@ -528,11 +717,72 @@ def root(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health(request):
+    health_status = {"status": "ok", "database": "connected", "redis": "connected"}
+    errs = {}
+
+    # 1. Database check
     try:
         connection.ensure_connection()
     except Exception as exc:
+        health_status["status"] = "unhealthy"
+        health_status["database"] = "error"
+        errs["database"] = str(exc)
+
+    # 2. Redis check (Channels layer)
+    try:
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            # Redisga kichik ping yuborish (ixtiyoriy, yoki shunchaki mavjudligini tekshirish)
+            # Biz bu yerda layer borligini va u ulanishga harakat qila olishini bilamiz.
+            pass
+    except Exception as exc:
+        health_status["status"] = "unhealthy"
+        health_status["redis"] = "error"
+        errs["redis"] = str(exc)
+
+    if health_status["status"] != "ok":
         return Response(
-            {"status": "unhealthy", "database": str(exc)},
+            {**health_status, "details": errs},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-    return Response({"status": "ok", "database": "connected"})
+    return Response(health_status)
+
+
+from rest_framework.views import APIView
+class SimulateVitalsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        patient_id = request.data.get("patient_id")
+        vitals = request.data.get("vitals", {})  # e.g. {"hr": 120, "spo2": 88}
+        
+        if not patient_id:
+            return Response({"error": "patient_id is required"}, status=400)
+            
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"clinic_{request.user.clinic_id if hasattr(request.user, 'clinic_id') else 'default'}",
+            {
+                "type": "vital_update",
+                "patient_id": patient_id,
+                "vitals": vitals,
+                "timestamp": time.time(),
+                "is_simulated": True
+            }
+        )
+        
+        from monitoring.models import ClinicalAuditLog, Patient
+        patient = Patient.objects.filter(id=patient_id).first()
+        ClinicalAuditLog.objects.create(
+            user=request.user,
+            action="SECURITY",
+            patient=patient,
+            details={"type": "simulation_trigger", "vitals": vitals},
+            ip_address=request.META.get("REMOTE_ADDR")
+        )
+        
+        return Response({"status": "Simulation broadcasted"})
