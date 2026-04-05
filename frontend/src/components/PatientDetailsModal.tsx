@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback, useLayoutEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useMemo, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { useModalDismiss } from '../hooks/useModalDismiss';
 import { useStore, AlarmLimits, mergeAlarmLimits } from '../store';
+import { useAuthStore } from '../authStore';
 import { X, Download, Activity, Heart, Battery, UserCircle, Calendar, Stethoscope, UserMinus, Settings2, LineChart as ChartIcon, Save, AlertTriangle, Pill, FlaskConical, FileText, Plus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
@@ -105,6 +106,7 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
   const addClinicalNote = useStore(state => state.addClinicalNote);
+  const username = useAuthStore(state => state.username);
 
   const patient = patients[patientId];
 
@@ -208,7 +210,7 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
     if (newNote.trim()) {
       addClinicalNote(patient.id, {
         text: newNote,
-        author: 'Dr. Admin' // Mock author
+        author: username || 'Foydalanuvchi',
       });
       setNewNote('');
     }
@@ -372,18 +374,6 @@ function PatientDetailsModalContent({ patientId }: { patientId: string }) {
                     <span className="text-xs font-semibold uppercase tracking-wider">Shifokor / Hamshira</span>
                   </div>
                   <p className="text-zinc-900 font-semibold">{patient.doctor} <br/><span className="text-sm text-zinc-600 font-medium">{patient.assignedNurse}</span></p>
-                </div>
-                <div className="bg-zinc-100 p-4 rounded-xl border border-zinc-200">
-                  <div className="flex items-center text-zinc-600 mb-2">
-                    <Activity className="w-4 h-4 mr-2" />
-                    <span className="text-xs font-semibold uppercase tracking-wider">NEWS2 Bali</span>
-                  </div>
-                  <p className={`text-2xl font-bold ${
-                    (patient.news2Score || 0) >= 7 ? 'text-red-700' :
-                    (patient.news2Score || 0) >= 5 ? 'text-orange-600' :
-                    (patient.news2Score || 0) >= 1 ? 'text-amber-700' :
-                    'text-emerald-700'
-                  }`}>{patient.news2Score || 0}</p>
                 </div>
                 <div className="bg-zinc-100 p-4 rounded-xl border border-zinc-200">
                   <div className="flex items-center text-zinc-600 mb-2">

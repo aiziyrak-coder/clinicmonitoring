@@ -1,4 +1,4 @@
-import { Heart, Clock, X, Battery, UserCircle, Droplets, RefreshCw, Brain, Pin } from 'lucide-react';
+import { Heart, Clock, X, Battery, UserCircle, Droplets, RefreshCw, Pin } from 'lucide-react';
 import { PatientData, useStore } from '../store';
 import { cn } from '../lib/utils';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -121,12 +121,7 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
             )}>
               {maskedName}
             </h3>
-              {patient.aiRisk && (
-              <div className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500/20 border border-red-500/50 animate-pulse shrink-0" title="AI Prognoz: O'lim xavfi">
-                <Brain className="w-2.5 h-2.5 text-red-500" />
-              </div>
-            )}
-            {patient.isPinned && (
+              {patient.isPinned && (
               <Pin className="w-3 h-3 text-emerald-500 shrink-0 fill-emerald-500" />
             )}
           </div>
@@ -173,15 +168,6 @@ export const PatientMonitor = React.memo(function PatientMonitor({ patient, size
           
           {!isSmall && (
             <div className="flex space-x-1 items-center mt-0.5">
-              <div className={cn(
-                "flex items-center justify-center rounded px-1.5 py-0.5 border text-[9px] font-bold",
-                patient.news2Score >= 7 ? "bg-red-100 border-red-300 text-red-800" :
-                patient.news2Score >= 5 ? "bg-orange-100 border-orange-300 text-orange-900" :
-                patient.news2Score >= 1 ? "bg-amber-100 border-amber-300 text-amber-900" :
-                "bg-emerald-100 border-emerald-300 text-emerald-900"
-              )} title="NEWS2 Bali">
-                N: {patient.news2Score}
-              </div>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); togglePinPatient(patient.id); }}

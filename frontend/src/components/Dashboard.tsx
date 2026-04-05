@@ -2,14 +2,12 @@ import { useEffect, useState, memo, useMemo, useRef } from 'react';
 import { useAuthStore } from '../authStore';
 import { useStore } from '../store';
 import { PatientMonitor } from './PatientMonitor';
-import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, WifiOff, Pin, BookOpen, LogOut, Moon, Sun, FlaskConical, RefreshCw, Brain } from 'lucide-react';
+import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, BookOpen, LogOut, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { PatientDetailsModal } from './PatientDetailsModal';
 import { AdmitPatientModal } from './AdmitPatientModal';
-import { SimulationModal } from './SimulationModal';
 import { useAudioAlarm } from '../hooks/useAudioAlarm';
 import { SettingsModal } from './SettingsModal';
-import { AiPredictionModal } from './AiPredictionModal';
 import { ColorGuideModal } from './ColorGuideModal';
 
 type DepartmentFilter = 'all' | 'reanimatsiya' | 'palata';
@@ -31,7 +29,7 @@ const Clock = memo(() => {
 });
 
 export function Dashboard() {
-  useAudioAlarm(); // Initialize audio alarms
+  useAudioAlarm();
 
   const clinicName = useAuthStore((s) => s.clinicName);
   const username = useAuthStore((s) => s.username);
@@ -42,18 +40,13 @@ export function Dashboard() {
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('all');
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isColorGuideOpen, setIsColorGuideOpen] = useState(false);
-  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark') || 
-             (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
-  const [previousAiRiskCount, setPreviousAiRiskCount] = useState(0);
-  const skipInitialAiNotification = useRef(true);
+
+  // Dark mode ni o'chirish — har doim light mode
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('theme');
+  }, []);
 
   useEffect(() => {
     connect();
@@ -69,33 +62,14 @@ export function Dashboard() {
 
   const patientList = useMemo(() => Object.values(patients), [patients]);
 
-  useEffect(() => {
-    const currentAiRiskCount = patientList.filter(p => p.aiRisk).length;
-    if (skipInitialAiNotification.current) {
-      skipInitialAiNotification.current = false;
-      setPreviousAiRiskCount(currentAiRiskCount);
-      return;
-    }
-    if (currentAiRiskCount > previousAiRiskCount) {
-      setIsAiModalOpen(true);
-    }
-    setPreviousAiRiskCount(currentAiRiskCount);
-  }, [patientList, previousAiRiskCount]);
-
   const filteredPatients = useMemo(() => {
     const filtered = patientList.filter(p => {
-      // Search filter
       if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase()) && !p.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-
-      // Severity filter
       if (filter === 'critical' && p.alarm.level !== 'red') return false;
       if (filter === 'warning' && p.alarm.level !== 'yellow' && p.alarm.level !== 'blue' && p.alarm.level !== 'purple') return false;
       if (filter === 'pinned' && !p.isPinned) return false;
-      
-      // Department filter
       if (departmentFilter === 'reanimatsiya' && !p.room.toLowerCase().includes('reanimatsiya')) return false;
       if (departmentFilter === 'palata' && !p.room.toLowerCase().includes('palata')) return false;
-
       return true;
     });
 
@@ -114,40 +88,31 @@ export function Dashboard() {
   const warningPatients = useMemo(() => filteredPatients.filter(p => p.alarm.level === 'yellow' || p.alarm.level === 'blue' || p.alarm.level === 'purple'), [filteredPatients]);
   const stablePatients = useMemo(() => filteredPatients.filter(p => p.alarm.level === 'none'), [filteredPatients]);
 
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
-
   const hasEmergency = useStore(state => state.hasEmergency());
 
   return (
-    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 ${hasEmergency ? 'emergency-pulse border-4 border-red-500/50' : ''}`}>
+    <div className={`min-h-screen bg-zinc-50 ${hasEmergency ? 'emergency-pulse border-4 border-red-500/50' : ''}`}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
       >
         Asosiy mazmunga o&apos;tish
       </a>
-      {/* Background: 3 rangli och gradient animatsiya (rasm yo'q) */}
+
+      {/* Background gradient animatsiya */}
       <div
-        className={`fixed inset-0 z-0 dashboard-bg-animated pointer-events-none transition-opacity duration-700 ${isDarkMode ? 'opacity-20 hue-rotate-180 brightness-50' : 'opacity-100'}`}
+        className="fixed inset-0 z-0 dashboard-bg-animated pointer-events-none"
         aria-hidden
       />
 
       {/* Content Wrapper */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Top Navigation Bar — bitta gorizontal oqim: masshtab/joy yetmasa gorizontal scroll, tartib o'zgarmaydi */}
-        <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800 shadow-sm backdrop-blur-xl transition-colors duration-300">
+
+        {/* Top Navigation Bar */}
+        <header className="sticky top-0 z-40 bg-white/90 border-b border-zinc-200 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-[100vw] min-w-0 flex-col gap-2 px-3 py-2 sm:px-4 sm:py-2.5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-            {/* Chap: brend + klinika nomi to‘liq (kesishsiz, qatorlarga bo‘linadi) */}
+
+            {/* Chap: logo + klinika nomi */}
             <div className="flex min-w-0 shrink-0 items-start gap-2 sm:gap-3 lg:max-w-[min(100%,28rem)] xl:max-w-[32rem]">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-emerald-200 bg-zinc-50 shadow-sm sm:h-10 sm:w-10 sm:rounded-xl">
                 <img src="/logo-fjsti.png" alt="" className="h-full w-full object-cover" />
@@ -173,7 +138,7 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Markaz: qidiruv + filtrlar — kenglikni to‘ldiradi */}
+            {/* Markaz: qidiruv + filtrlar */}
             <div
               className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300"
               role="toolbar"
@@ -244,23 +209,13 @@ export function Dashboard() {
               </select>
             </div>
 
-            {/* O‘ng: holat, soat, tezkor tugmalar — chekkaga yopishadi */}
+            {/* O'ng: holat, soat, tugmalar */}
             <div className="flex min-w-0 shrink-0 flex-nowrap items-center justify-end gap-1.5 overflow-x-auto py-0.5 sm:gap-2 lg:justify-end lg:pl-1">
               <div className="hidden items-center gap-1 sm:flex">
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
                 <span className="whitespace-nowrap font-mono text-[10px] text-zinc-700 sm:text-xs">{wsConnected ? 'ONLAYN' : 'OFLAYN'}</span>
               </div>
               <Clock />
-              <button
-                type="button"
-                onClick={() => setIsAiModalOpen(true)}
-                className="inline-flex shrink-0 items-center rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-800 transition-colors hover:bg-red-100 sm:px-2.5 sm:py-1.5 sm:text-xs"
-                title="O'lim holati aniqlandi"
-              >
-                <span className="mr-1 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" aria-hidden />
-                <span className="hidden min-[380px]:inline">AI Prognoz</span>
-                <span className="min-[380px]:hidden">AI</span>
-              </button>
               <div className="flex items-center gap-0.5 sm:gap-1">
                 <button
                   type="button"
@@ -269,43 +224,20 @@ export function Dashboard() {
                   title="Yangi bemor qabul qilish"
                   aria-label="Yangi bemor qabul qilish"
                 >
-                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
+                  <UserPlus className="h-4 w-4 text-zinc-700 sm:h-5 sm:w-5" aria-hidden />
                 </button>
                 <button
                   type="button"
                   onClick={toggleAudioMute}
-                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
-                  title={isAudioMuted ? 'Ovozni yoqish' : "Ovozni o'chirish"}
-                  aria-label={isAudioMuted ? 'Signal ovozini yoqish' : "Signal ovozini o'chirish"}
-                >
-                  {isAudioMuted ? <VolumeX className="h-4 w-4 text-red-500 sm:h-5 sm:w-5" aria-hidden /> : <Volume2 className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSimulationModalOpen(true)}
-                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
-                  title="Vitals Simulyatsiyasi (Lab)"
-                >
-                  <FlaskConical className="h-4 w-4 text-purple-600 dark:text-purple-400 sm:h-5 sm:w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleDarkMode}
-                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
-                  title={isDarkMode ? 'Yorug‘ rejim' : "Qorong‘u rejim"}
-                  aria-label="Rang rejimini almashtirish"
-                >
-                  {isDarkMode ? <Sun className="h-4 w-4 text-amber-400 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 text-zinc-600 sm:h-5 sm:w-5" />}
-                </button>
                 <button
                   type="button"
                   onClick={togglePrivacyMode}
-                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:p-2"
+                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
                   title="Maxfiylik rejimi"
                   aria-label={privacyMode ? "Maxfiylik rejimini o'chirish" : "Maxfiylik rejimini yoqish"}
                   aria-pressed={privacyMode}
                 >
-                  {privacyMode ? <EyeOff className="h-4 w-4 text-emerald-500 sm:h-5 sm:w-5" aria-hidden /> : <Eye className="h-4 w-4 dark:text-zinc-400 sm:h-5 sm:w-5" aria-hidden />}
+                  {privacyMode ? <EyeOff className="h-4 w-4 text-emerald-600 sm:h-5 sm:w-5" aria-hidden /> : <Eye className="h-4 w-4 text-zinc-600 sm:h-5 sm:w-5" aria-hidden />}
                 </button>
                 <button
                   type="button"
@@ -314,7 +246,7 @@ export function Dashboard() {
                   title="Ranglar bo'yicha yo'riqnoma"
                   aria-label="Ranglar bo'yicha to'liq yo'riqnoma"
                 >
-                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-500 sm:h-4 sm:w-4" aria-hidden />
+                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" aria-hidden />
                   <span className="hidden sm:inline">Yo&apos;riqnoma</span>
                 </button>
                 <button
@@ -324,188 +256,172 @@ export function Dashboard() {
                   title="Sozlamalar"
                   aria-label="Sozlamalar"
                 >
-                  <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Settings className="h-4 w-4 text-zinc-700 sm:h-5 sm:w-5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
-                  className="rounded-full p-1.5 transition-colors hover:bg-red-500/10 hover:text-red-600 sm:p-2"
+                  className="rounded-full p-1.5 transition-colors hover:bg-red-50 hover:text-red-600 sm:p-2"
                   title="Chiqish"
                   aria-label="Tizimdan chiqish"
                 >
-                  <LogOut className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
+                  <LogOut className="h-4 w-4 text-zinc-700 sm:h-5 sm:w-5" aria-hidden />
                 </button>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Global Stats Bar — Premium Dashboard Feel */}
+        {/* Stats Bar */}
         <div className="px-4 pt-4 sm:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Total Patients */}
             <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Users className="w-5 h-5 text-emerald-700" />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Bemorlar</p>
-                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">{patientList.length}</p>
+                <p className="text-xl font-black text-zinc-900">{patientList.length}</p>
               </div>
             </div>
 
-            {/* Critical Alarms */}
+            {/* Critical */}
             <div className={`glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3 ${criticalCount > 0 ? 'ring-2 ring-red-500/50 animate-pulse' : ''}`}>
-              <div className={`p-2 rounded-lg ${criticalCount > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
-                <Activity className={`w-5 h-5 ${criticalCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`} />
+              <div className={`p-2 rounded-lg ${criticalCount > 0 ? 'bg-red-100' : 'bg-zinc-100'}`}>
+                <Activity className={`w-5 h-5 ${criticalCount > 0 ? 'text-red-700' : 'text-zinc-400'}`} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Kritik</p>
-                <p className={`text-xl font-black ${criticalCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalCount}</p>
+                <p className={`text-xl font-black ${criticalCount > 0 ? 'text-red-700' : 'text-zinc-900'}`}>{criticalCount}</p>
               </div>
             </div>
 
-            {/* Warning Alarms */}
+            {/* Warning */}
             <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${warningCount > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
-                <RefreshCw className={`w-5 h-5 ${warningCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`} />
+              <div className={`p-2 rounded-lg ${warningCount > 0 ? 'bg-amber-100' : 'bg-zinc-100'}`}>
+                <RefreshCw className={`w-5 h-5 ${warningCount > 0 ? 'text-amber-700' : 'text-zinc-400'}`} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ogohlantirish</p>
-                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">{warningCount}</p>
+                <p className="text-xl font-black text-zinc-900">{warningCount}</p>
               </div>
             </div>
 
-            {/* Average NEWS2 Score */}
-            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">O'rtacha NEWS2</p>
-                <p className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-                  {patientList.length > 0 ? (patientList.reduce((acc, p) => acc + p.news2Score, 0) / patientList.length).toFixed(1) : '–'}
-                </p>
-              </div>
-            </div>
-
-            {/* Connection Health */}
-            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm flex items-center gap-3 hidden lg:flex">
-              <div className={`p-2 rounded-lg ${wsConnected ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                <Wifi className={`w-5 h-5 ${wsConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+            {/* Connection */}
+            <div className="glass-card-premium p-3 rounded-xl border border-white/20 shadow-sm items-center gap-3 hidden lg:flex">
+              <div className={`p-2 rounded-lg ${wsConnected ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                <Wifi className={`w-5 h-5 ${wsConnected ? 'text-emerald-700' : 'text-red-700'}`} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tizim holati</p>
-                <p className={`text-sm font-black uppercase ${wsConnected ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {wsConnected ? 'Ishlayapti' : 'Aloqa yo\'q'}
+                <p className={`text-sm font-black uppercase ${wsConnected ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {wsConnected ? 'Ishlayapti' : "Aloqa yo'q"}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-      {/* Main Content Grid */}
-      <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 flex-1 outline-none">
-        {patientList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600 px-4">
-            {!wsConnected ? (
-              <>
-                <Activity className="w-12 h-12 mb-4 animate-pulse opacity-50" />
-                <p className="text-lg font-medium">Telemetriya serveriga ulanmoqda...</p>
-                <p className="text-sm font-mono mt-2">WebSocket kutilmoqda</p>
-              </>
-            ) : (
-              <>
-                <Users className="w-12 h-12 mb-4 opacity-40" />
-                <p className="text-lg font-semibold text-zinc-900">Hozircha bemor yo&apos;q</p>
-                <p className="text-sm mt-2 text-center max-w-md text-zinc-700">Bemor qabul qilish tugmasi orqali karavatni tanlang va bemorni ro&apos;yxatga qo&apos;shing.</p>
-                <button
-                  type="button"
-                  onClick={() => setIsAdmitModalOpen(true)}
-                  className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
-                >
-                  <UserPlus className="w-5 h-5" />
-                  Bemor qabul qilish
-                </button>
-              </>
-            )}
-          </div>
-        ) : filteredPatients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600">
-            <Users className="w-12 h-12 mb-4 opacity-50" />
-            <p className="text-lg font-semibold text-zinc-900">Joriy filtrga mos bemorlar topilmadi.</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Critical (Red) */}
-            {criticalPatients.length > 0 && (
-              <div>
-                <h2 className="text-red-700 font-bold mb-4 flex items-center">
-                  <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />
-                  Kritik Holat
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {criticalPatients.map(patient => (
-                    <PatientMonitor key={patient.id} patient={patient} size="large" />
-                  ))}
+        {/* Main Content */}
+        <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 flex-1 outline-none">
+          {patientList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600 px-4">
+              {!wsConnected ? (
+                <>
+                  <Activity className="w-12 h-12 mb-4 animate-pulse opacity-50" />
+                  <p className="text-lg font-medium text-zinc-800">Telemetriya serveriga ulanmoqda...</p>
+                  <p className="text-sm font-mono mt-2 text-zinc-600">WebSocket kutilmoqda</p>
+                </>
+              ) : (
+                <>
+                  <Users className="w-12 h-12 mb-4 opacity-40" />
+                  <p className="text-lg font-semibold text-zinc-900">Hozircha bemor yo&apos;q</p>
+                  <p className="text-sm mt-2 text-center max-w-md text-zinc-700">Bemor qabul qilish tugmasi orqali karavatni tanlang va bemorni ro&apos;yxatga qo&apos;shing.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsAdmitModalOpen(true)}
+                    className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    Bemor qabul qilish
+                  </button>
+                </>
+              )}
+            </div>
+          ) : filteredPatients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-600">
+              <Users className="w-12 h-12 mb-4 opacity-50" />
+              <p className="text-lg font-semibold text-zinc-900">Joriy filtrga mos bemorlar topilmadi.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {criticalPatients.length > 0 && (
+                <div>
+                  <h2 className="text-red-700 font-bold mb-4 flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />
+                    Kritik Holat
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {criticalPatients.map(patient => (
+                      <PatientMonitor key={patient.id} patient={patient} size="large" />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Warning (Yellow, Blue, Purple) */}
-            {warningPatients.length > 0 && (
-              <div>
-                <h2 className="text-amber-800 font-bold mb-4 flex items-center">
-                  <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
-                  Ogohlantirish
-                </h2>
-                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-[repeat(10,minmax(0,1fr))] gap-3">
-                  {warningPatients.map(patient => (
-                    <PatientMonitor key={patient.id} patient={patient} size="medium" />
-                  ))}
+              {warningPatients.length > 0 && (
+                <div>
+                  <h2 className="text-amber-800 font-bold mb-4 flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
+                    Ogohlantirish
+                  </h2>
+                  <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-[repeat(10,minmax(0,1fr))] gap-3">
+                    {warningPatients.map(patient => (
+                      <PatientMonitor key={patient.id} patient={patient} size="medium" />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Stable (None) */}
-            {stablePatients.length > 0 && (
-              <div>
-                <h2 className="text-emerald-800 font-bold mb-4 flex items-center">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
-                  Stabil Holat
-                </h2>
-                <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-[repeat(15,minmax(0,1fr))] gap-2">
-                  {stablePatients.map(patient => (
-                    <PatientMonitor key={patient.id} patient={patient} size="small" />
-                  ))}
+              {stablePatients.length > 0 && (
+                <div>
+                  <h2 className="text-emerald-800 font-bold mb-4 flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
+                    Stabil Holat
+                  </h2>
+                  <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-[repeat(15,minmax(0,1fr))] gap-2">
+                    {stablePatients.map(patient => (
+                      <PatientMonitor key={patient.id} patient={patient} size="small" />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="mt-auto py-3 px-6 border-t border-zinc-200 bg-white/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-600 font-medium z-40 shrink-0">
+          <div className="flex items-center space-x-1">
+            <span>&copy; 2026 ClinicMonitoring. Farg&apos;ona Jamoat Salomatligi Tibbiyot Instituti</span>
           </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="mt-auto py-3 px-6 border-t border-zinc-200 bg-white/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-600 font-medium z-40 shrink-0">
-        <div className="flex items-center space-x-1">
-          <span>&copy; 2026 ClinicMonitoring. Farg&apos;ona Jamoat Salomatligi Tibbiyot Instituti</span>
-        </div>
-        <div className="flex items-center space-x-4 mt-2 sm:mt-0">
-          <span className="flex items-center">
-            Ishlab chiqaruvchi: 
-            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-emerald-700 transition-colors">
-              CDCGroup
-            </a>
-          </span>
-          <span className="w-1 h-1 rounded-full bg-zinc-300"></span>
-          <span className="flex items-center">
-            Qo'llab-quvvatlovchi: 
-            <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-purple-700 transition-colors">
-              CraDev Company
-            </a>
-          </span>
-        </div>
-      </footer>
+          <div className="flex items-center space-x-4 mt-2 sm:mt-0">
+            <span className="flex items-center">
+              Ishlab chiqaruvchi:
+              <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-emerald-700 transition-colors">
+                CDCGroup
+              </a>
+            </span>
+            <span className="w-1 h-1 rounded-full bg-zinc-300" />
+            <span className="flex items-center">
+              Qo'llab-quvvatlovchi:
+              <a href="https://cdcgroup.uz" target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-zinc-800 hover:text-purple-700 transition-colors">
+                CraDev Company
+              </a>
+            </span>
+          </div>
+        </footer>
       </div>
 
       {/* Modals */}
@@ -520,13 +436,7 @@ export function Dashboard() {
           }}
         />
       )}
-      {isAiModalOpen && <AiPredictionModal onClose={() => setIsAiModalOpen(false)} />}
       {isColorGuideOpen && <ColorGuideModal onClose={() => setIsColorGuideOpen(false)} />}
-      <SimulationModal 
-        isOpen={isSimulationModalOpen}
-        onClose={() => setIsSimulationModalOpen(false)}
-        patients={patients}
-      />
     </div>
   );
 }
