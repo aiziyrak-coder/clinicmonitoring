@@ -3,10 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAuthStore } from './authStore';
-import { Dashboard } from './components/Dashboard';
 import { LoginPage } from './components/LoginPage';
+
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then((m) => ({ default: m.Dashboard })),
+);
 
 export default function App() {
   const checked = useAuthStore((s) => s.checked);
@@ -14,6 +17,9 @@ export default function App() {
   const checkSession = useAuthStore((s) => s.checkSession);
 
   useEffect(() => {
+    // Har doim light mode — dark mode o'chirilgan
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('theme');
     checkSession();
   }, [checkSession]);
 
@@ -29,5 +35,15 @@ export default function App() {
     return <LoginPage />;
   }
 
-  return <Dashboard />;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50 flex items-center justify-center text-zinc-700 font-medium">
+          Panel yuklanmoqda…
+        </div>
+      }
+    >
+      <Dashboard />
+    </Suspense>
+  );
 }

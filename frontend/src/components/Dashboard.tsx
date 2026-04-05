@@ -2,7 +2,7 @@ import { useEffect, useState, memo, useMemo, useRef } from 'react';
 import { useAuthStore } from '../authStore';
 import { useStore } from '../store';
 import { PatientMonitor } from './PatientMonitor';
-import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, WifiOff, Pin, BookOpen, LogOut, RefreshCw } from 'lucide-react';
+import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, Pin, BookOpen, LogOut, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { PatientDetailsModal } from './PatientDetailsModal';
 import { AdmitPatientModal } from './AdmitPatientModal';
@@ -131,7 +131,10 @@ export function Dashboard() {
                     aria-live="polite"
                     className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold sm:text-[10px] ${wsConnected ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}
                   >
-                    {wsConnected ? <Wifi className="mr-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden /> : <WifiOff className="mr-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden />}
+                    <Wifi
+                      className={`mr-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 ${wsConnected ? 'text-emerald-600' : 'text-red-500 opacity-70'}`}
+                      aria-hidden
+                    />
                     {wsConnected ? 'Online' : 'Offline'}
                   </div>
                 </div>
