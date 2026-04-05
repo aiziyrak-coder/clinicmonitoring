@@ -229,6 +229,13 @@ export function Dashboard() {
                 <button
                   type="button"
                   onClick={toggleAudioMute}
+                  className="rounded-full p-1.5 transition-colors hover:bg-zinc-100 sm:p-2"
+                  title={isAudioMuted ? "Tovushni yoqish" : "Tovushni o'chirish"}
+                  aria-label={isAudioMuted ? "Tovushni yoqish" : "Tovushni o'chirish"}
+                  aria-pressed={isAudioMuted}
+                >
+                  {isAudioMuted ? <VolumeX className="h-4 w-4 text-zinc-600 sm:h-5 sm:w-5" aria-hidden /> : <Volume2 className="h-4 w-4 text-zinc-600 sm:h-5 sm:w-5" aria-hidden />}
+                </button>
                 <button
                   type="button"
                   onClick={togglePrivacyMode}
