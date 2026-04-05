@@ -47,16 +47,23 @@ if not DEBUG:
             "DEBUG=false da '*' yoki bo'sh qoldirish mumkin emas (Host header hujumlari)."
         )
 
-_csrf = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "")
-CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf.split(",") if x.strip()]
+_PRODUCTION_ORIGINS = [
+    "https://clinicmonitoring.ziyrak.org",
+    "https://clinicmonitoringapi.ziyrak.org",
+]
+
+_csrf_env = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+_csrf_extra = [x.strip() for x in _csrf_env.split(",") if x.strip()]
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(_PRODUCTION_ORIGINS + _csrf_extra))
 
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
-    _cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
-    CORS_ALLOWED_ORIGINS = [x.strip() for x in _cors.split(",") if x.strip()]
+    _cors_env = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+    _cors_extra = [x.strip() for x in _cors_env.split(",") if x.strip()]
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_PRODUCTION_ORIGINS + _cors_extra))
     CORS_ALLOW_CREDENTIALS = True   # credentials: 'include' uchun majburiy
 
 INSTALLED_APPS = [
@@ -166,8 +173,10 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
-        "user": "1000/hour",
+        "anon": "200/day",
+        "user": "2000/hour",
+        "login": "10/minute",    # Login/register uchun qattiq limit — brute force himoya
+        "register": "5/hour",   # Ro'yxatdan o'tish — spam himoya
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
