@@ -2,7 +2,7 @@ import { useEffect, useState, memo, useMemo, useRef } from 'react';
 import { useAuthStore } from '../authStore';
 import { useStore } from '../store';
 import { PatientMonitor } from './PatientMonitor';
-import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, BookOpen, LogOut, RefreshCw } from 'lucide-react';
+import { Activity, Settings, Users, Eye, EyeOff, Search, UserPlus, Volume2, VolumeX, Wifi, WifiOff, Pin, BookOpen, LogOut, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { PatientDetailsModal } from './PatientDetailsModal';
 import { AdmitPatientModal } from './AdmitPatientModal';
