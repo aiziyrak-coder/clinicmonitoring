@@ -1,12 +1,9 @@
 import {
-  useCallback,
-  useEffect,
   useMemo,
   useState,
-  type ChangeEvent,
   type FormEvent,
 } from 'react';
-import { X, Upload, Building2, ChevronRight } from 'lucide-react';
+import { X, Monitor } from 'lucide-react';
 import { authedFetch } from '../authStore';
 
 export interface InfrastructureShape {
@@ -21,22 +18,19 @@ interface AddDeviceFromScreenModalProps {
   onSuccess: () => void;
 }
 
-/**
- * Bo'lim → palata → karavat, keyin monitor tarmoq ekrani rasmi.
- * Backend Gemini Vision bilan maydonlarni o'qiydi va qurilma yaratadi.
- */
 export function AddDeviceFromScreenModal({
   infrastructure,
   onClose,
   onSuccess,
 }: AddDeviceFromScreenModalProps) {
   const [departmentId, setDepartmentId] = useState('');
-  const [roomId, setRoomId] = useState('');
-  const [bedId, setBedId] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [roomId, setRoomId]             = useState('');
+  const [bedId, setBedId]               = useState('');
+  const [ipAddress, setIpAddress]       = useState('');
+  const [model, setModel]               = useState('');
+  const [hl7Port, setHl7Port]           = useState('6006');
+  const [busy, setBusy]                 = useState(false);
+  const [error, setError]               = useState<string | null>(null);
 
   const roomsInDept = useMemo(
     () => infrastructure.rooms.filter((r) => r.departmentId === departmentId),
@@ -47,58 +41,54 @@ export function AddDeviceFromScreenModal({
     [infrastructure.beds, roomId],
   );
 
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
-  const onPickFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    setFile(f ?? null);
-    setError(null);
-  }, []);
-
-  const canSubmit =
-    Boolean(departmentId && roomId && bedId && file && !busy);
+  const canSubmit = Boolean(departmentId && roomId && bedId && ipAddress.trim() && !busy);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !file) return;
+    if (!canSubmit) return;
+
+    // IP format tekshiruv
+    const ipRx = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRx.test(ipAddress.trim())) {
+      setError("IP manzil noto'g'ri (masalan: 192.168.1.100)");
+      return;
+    }
+
+    const port = parseInt(hl7Port, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      setError("Port 1–65535 oralig'ida bo'lishi kerak");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append('bedId', bedId);
-      fd.append('image', file);
-      const res = await authedFetch('/api/devices/from-screen/', {
+      const body = {
+        ipAddress: ipAddress.trim(),
+        model:     model.trim() || 'Monitor',
+        hl7Enabled: true,
+        hl7Port:   port,
+        bedId,
+      };
+      const res = await authedFetch('/api/devices/', {
         method: 'POST',
-        body: fd,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
-      const raw = await res.text();
-      let detail: unknown = raw;
-      try {
-        detail = raw ? JSON.parse(raw) : {};
-      } catch {
-        /* ignore */
-      }
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg =
-          typeof detail === 'object' && detail !== null && 'detail' in detail
-            ? String((detail as { detail: unknown }).detail)
+          typeof data === 'object' && data !== null
+            ? (data as Record<string, unknown>).detail ??
+              Object.values(data as Record<string, unknown>).flat().join(' ')
             : res.statusText;
-        setError(msg || `Xatolik (${res.status})`);
+        setError(String(msg) || `Xatolik (${res.status})`);
         return;
       }
       onSuccess();
       onClose();
-    } catch (err) {
-      console.error(err);
-      setError("Tarmoq xatosi — backend va GEMINI_API_KEY ni tekshiring.");
+    } catch {
+      setError('Tarmoq xatosi — server bilan aloqa yo'q.');
     } finally {
       setBusy(false);
     }
@@ -107,151 +97,149 @@ export function AddDeviceFromScreenModal({
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-zinc-900/35 backdrop-blur-sm p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="add-device-screen-title"
-        className="bg-white border border-zinc-200 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+        aria-labelledby="add-device-title"
+        className="bg-white border border-zinc-200 rounded-xl w-full max-w-md shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-zinc-200 bg-zinc-50/80">
-          <div className="flex items-center gap-2 text-emerald-700">
-            <Building2 className="w-5 h-5" />
-            <h2 id="add-device-screen-title" className="text-lg font-bold text-zinc-900">
-              Qurilma (ekran rasmi)
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 bg-zinc-50">
+          <div className="flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-emerald-600" />
+            <h2 id="add-device-title" className="text-base font-bold text-zinc-900">
+              Qurilma qo'shish
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
+            className="p-1.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg"
             aria-label="Yopish"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <p className="text-sm text-zinc-700 font-medium">
-            Avval joyni tanlang, keyin monitorning <strong className="text-zinc-900">Интернет / HL7</strong>{' '}
-            oynasining skrinshotini yuklang — tizim IP, MAC va portlarni o‘qiydi.
-          </p>
-
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-medium p-3 rounded-lg">
               {error}
             </div>
           )}
 
+          {/* Bo'lim */}
           <div>
-            <label className="block text-sm text-zinc-700 font-medium mb-1">Bo‘lim</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Bo'lim</label>
             <select
               value={departmentId}
-              onChange={(e) => {
-                setDepartmentId(e.target.value);
-                setRoomId('');
-                setBedId('');
-              }}
-              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium"
+              onChange={(e) => { setDepartmentId(e.target.value); setRoomId(''); setBedId(''); }}
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               required
             >
               <option value="">Tanlang…</option>
               {infrastructure.departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
+                <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
           </div>
 
+          {/* Palata */}
           <div>
-            <label className="block text-sm text-zinc-700 font-medium mb-1">Palata / xona</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Palata</label>
             <select
               value={roomId}
-              onChange={(e) => {
-                setRoomId(e.target.value);
-                setBedId('');
-              }}
+              onChange={(e) => { setRoomId(e.target.value); setBedId(''); }}
               disabled={!departmentId}
-              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium disabled:opacity-50"
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-40"
               required
             >
               <option value="">Tanlang…</option>
               {roomsInDept.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
+                <option key={r.id} value={r.id}>{r.name}</option>
               ))}
             </select>
           </div>
 
+          {/* Karavat */}
           <div>
-            <label className="block text-sm text-zinc-700 font-medium mb-1">Karavat / joy</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Karavat / joy</label>
             <select
               value={bedId}
               onChange={(e) => setBedId(e.target.value)}
               disabled={!roomId}
-              className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-zinc-900 font-medium disabled:opacity-50"
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-40"
               required
             >
               <option value="">Tanlang…</option>
               {bedsInRoom.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.id})
-                </option>
+                <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="border border-dashed border-zinc-300 bg-zinc-50 rounded-lg p-4 text-center">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={onPickFile}
-              className="hidden"
-              id="monitor-screen-file"
-            />
-            <label
-              htmlFor="monitor-screen-file"
-              className="cursor-pointer flex flex-col items-center gap-2 text-zinc-600 hover:text-emerald-700 font-medium"
-            >
-              <Upload className="w-8 h-8" />
-              <span>Rasm tanlash (JPEG / PNG)</span>
-              {file && <span className="text-xs font-mono text-zinc-600">{file.name}</span>}
+          <hr className="border-zinc-200" />
+
+          {/* IP manzil */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              Monitor IP manzili <span className="text-red-500">*</span>
             </label>
-            {previewUrl && (
-              <img
-                src={previewUrl}
-                alt="Yuklangan ekran"
-                className="mt-3 max-h-48 mx-auto rounded border border-zinc-200"
-              />
-            )}
+            <input
+              type="text"
+              value={ipAddress}
+              onChange={(e) => setIpAddress(e.target.value)}
+              placeholder="192.168.1.100"
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              required
+            />
           </div>
 
-          <p className="text-xs text-zinc-600 flex items-start gap-1 font-medium">
-            <ChevronRight className="w-4 h-4 shrink-0 mt-0.5" />
-            Backend-da <code className="text-zinc-900 bg-zinc-100 px-1 rounded font-mono text-[11px]">GEMINI_API_KEY</code> bo‘lishi kerak (Google AI
-            Studio).
-          </p>
+          {/* Model nomi */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              Model nomi <span className="text-zinc-400 font-normal">(ixtiyoriy)</span>
+            </label>
+            <input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="Creative Medical K12"
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
 
+          {/* HL7 Port */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">HL7 port</label>
+            <input
+              type="number"
+              value={hl7Port}
+              onChange={(e) => setHl7Port(e.target.value)}
+              min={1}
+              max={65535}
+              className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* Tugmalar */}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-zinc-600 hover:text-zinc-900 font-semibold"
+              className="px-4 py-2 text-zinc-600 hover:text-zinc-900 font-semibold text-sm"
             >
               Bekor
             </button>
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-40"
+              className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-40 font-semibold text-sm"
             >
-              {busy ? 'Tahlil…' : 'Qurilma qo‘shish'}
+              {busy ? 'Saqlanmoqda…' : 'Qo'shish'}
             </button>
           </div>
         </form>

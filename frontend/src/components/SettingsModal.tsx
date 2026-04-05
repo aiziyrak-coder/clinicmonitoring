@@ -23,6 +23,7 @@ function CustomPrompt({ isOpen, title, fields, onSubmit, onCancel }: { isOpen: b
 
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/30 backdrop-blur-sm p-4"
       onClick={(e) => {
         e.stopPropagation();
@@ -30,17 +31,20 @@ function CustomPrompt({ isOpen, title, fields, onSubmit, onCancel }: { isOpen: b
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prompt-dialog-title"
         className="bg-white border border-zinc-200 shadow-xl rounded-xl w-full max-w-md p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        role="document"
       >
-        <h3 className="text-lg font-bold text-zinc-900 mb-4">{title}</h3>
+        <h3 id="prompt-dialog-title" className="text-lg font-bold text-zinc-900 mb-4">{title}</h3>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(values); }}>
           <div className="space-y-4 mb-6">
             {fields.map(f => (
               <div key={f.name}>
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">{f.label}</label>
-                <input 
+                <label htmlFor={`prompt-field-${f.name}`} className="block text-sm font-semibold text-zinc-700 mb-1">{f.label}</label>
+                <input
+                  id={`prompt-field-${f.name}`}
                   type="text" 
                   value={values[f.name] || ''}
                   onChange={e => setValues({...values, [f.name]: e.target.value})}
@@ -254,12 +258,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       onSubmit: async (vals) => {
         if (!vals.name) return closeDialogs();
         try {
-          await authedFetch('/api/departments/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name }) });
+          const res = await authedFetch('/api/departments/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name }) });
+          if (!res.ok) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error(e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -278,13 +283,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       message: "Rostdan ham bu bo'limni o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
-          console.log(`🗑️ Deleting department: ${id}`);
-          await authedFetch(`/api/departments/${id}/`, { method: 'DELETE' });
+          const res = await authedFetch(`/api/departments/${id}/`, { method: 'DELETE' });
+          if (!res.ok && res.status !== 204) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); closeDialogs(); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error('Delete error:', e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -302,12 +307,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       onSubmit: async (vals) => {
         if (!vals.name) return closeDialogs();
         try {
-          await authedFetch('/api/rooms/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name, departmentId: deptId }) });
+          const res = await authedFetch('/api/rooms/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name, departmentId: deptId }) });
+          if (!res.ok) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error(e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -326,13 +332,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       message: "Rostdan ham bu palatani o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
-          console.log(`🗑️ Deleting room: ${id}`);
-          await authedFetch(`/api/rooms/${id}/`, { method: 'DELETE' });
+          const res = await authedFetch(`/api/rooms/${id}/`, { method: 'DELETE' });
+          if (!res.ok && res.status !== 204) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); closeDialogs(); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error('Delete error:', e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -346,12 +352,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       onSubmit: async (vals) => {
         if (!vals.name) return closeDialogs();
         try {
-          await authedFetch('/api/beds/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name, roomId }) });
+          const res = await authedFetch('/api/beds/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: vals.name, roomId }) });
+          if (!res.ok) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error(e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -370,13 +377,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       message: "Rostdan ham bu joyni o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
-          console.log(`🗑️ Deleting bed: ${id}`);
-          await authedFetch(`/api/beds/${id}/`, { method: 'DELETE' });
+          const res = await authedFetch(`/api/beds/${id}/`, { method: 'DELETE' });
+          if (!res.ok && res.status !== 204) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); closeDialogs(); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error('Delete error:', e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -395,12 +402,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       onSubmit: async (vals) => {
         if (!vals.bedId) return closeDialogs();
         try {
-          await authedFetch(`/api/devices/${deviceId}/`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bedId: vals.bedId }) });
+          const res = await authedFetch(`/api/devices/${deviceId}/`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bedId: vals.bedId }) });
+          if (!res.ok) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error(e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -413,12 +421,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
       message: "Rostdan ham bu qurilmani o'chirmoqchimisiz?",
       onConfirm: async () => {
         try {
-          await authedFetch(`/api/devices/${id}/`, { method: 'DELETE' });
+          const res = await authedFetch(`/api/devices/${id}/`, { method: 'DELETE' });
+          if (!res.ok && res.status !== 204) { const t = await res.json().catch(() => ({})) as {detail?: string}; setError(t.detail || `Xatolik: ${res.status}`); closeDialogs(); return; }
           closeDialogs();
           fetchData();
         } catch (e) {
           console.error(e);
-          setError("Xatolik yuz berdi");
+          setError("Tarmoq xatosi — internet aloqasini tekshiring.");
         }
       }
     });
@@ -521,7 +530,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                 {activeTab === 'structure' && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-medium text-white">
+                      <h3 className="text-lg font-medium text-zinc-900">
                         {selectedRoomId ? 'Joylar' : selectedDeptId ? 'Palatalar' : 'Kasalxona Tuzilmasi'}
                       </h3>
                       <div className="flex items-center space-x-2">
@@ -664,7 +673,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                 {activeTab === 'devices' && (
                   <div className="space-y-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-lg font-medium text-white">Bemor Monitorlari</h3>
+                      <h3 className="text-lg font-medium text-zinc-900">Bemor Monitorlari</h3>
                       <div className="flex flex-wrap items-center gap-2">
                         {onOpenAdmitPatient && (
                           <button
@@ -696,39 +705,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                       </p>
                     </div>
 
-                    {data.geminiConfigured !== true && (
-                      <div
-                        role="status"
-                        className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-                      >
-                        <div className="font-bold text-amber-900 mb-1">GEMINI_API_KEY (rasm tahlili)</div>
-                        <p className="text-zinc-800 mb-2">
-                          «Qurilma qo&apos;shish» (ekran rasmi) uchun serverda{' '}
-                          <code className="text-emerald-800 font-mono">GEMINI_API_KEY</code> bo&apos;lishi kerak — Google AI
-                          Studio kaliti.
-                        </p>
-                        <p className="text-zinc-600 text-xs font-mono">
-                          Masofadan:{' '}
-                          <span className="text-zinc-900">
-                            set DEPLOY_GEMINI_KEY=&lt;kalit&gt; &amp;&amp; set SSH_PASSWORD=... &amp;&amp; python
-                            deploy/deploy_remote.py update
-                          </span>
-                        </p>
-                        <p className="text-zinc-500 text-xs mt-2">
-                          Yoki serverda: <code>/opt/clinicmonitoring/backend/.env</code> —{' '}
-                          <code>GEMINI_API_KEY=...</code>, keyin{' '}
-                          <code>systemctl restart clinicmonitoring-daphne</code>
-                        </p>
-                      </div>
-                    )}
-
                     {connectionCheck && (
                       <div
                         role="status"
                         aria-live="polite"
                         className={`rounded-xl border p-4 text-sm ${
                           connectionCheck.checkTone === 'success'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                             : connectionCheck.checkTone === 'warning'
                               ? 'bg-amber-50 border-amber-200 text-amber-950'
                               : 'bg-sky-50 border-sky-200 text-sky-950'
@@ -736,7 +719,13 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="font-bold text-white mb-1">
+                            <div className={`font-bold mb-1 ${
+                              connectionCheck.checkTone === 'success'
+                                ? 'text-emerald-800'
+                                : connectionCheck.checkTone === 'warning'
+                                  ? 'text-amber-900'
+                                  : 'text-sky-900'
+                            }`}>
                               Ulanish tekshiruvi:{' '}
                               {connectionCheck.checkTone === 'success'
                                 ? 'OK'
@@ -977,7 +966,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                   <div className="space-y-6">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-medium text-white">Faol Bemorlar</h3>
+                        <h3 className="text-lg font-medium text-zinc-900">Faol Bemorlar</h3>
                         <p className="text-sm text-zinc-500">Yangi bemorni quyidagi tugma orqali yoki asosiy ekran sarlavhasidagi ikon orqali qabul qiling.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1036,7 +1025,7 @@ export function SettingsModal({ onClose, onOpenAdmitPatient }: SettingsModalProp
                 {/* Integration Tab */}
                 {activeTab === 'integration' && (
                   <div className="space-y-6 text-zinc-800">
-                    <h3 className="text-lg font-medium text-white">Qurilmalarni Tizimga Ulash (Integratsiya)</h3>
+                    <h3 className="text-lg font-medium text-zinc-900">Qurilmalarni Tizimga Ulash (Integratsiya)</h3>
                     
                     <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                       <h4 className="font-bold text-blue-400 mb-2">HL7 (port 6006) va server</h4>
