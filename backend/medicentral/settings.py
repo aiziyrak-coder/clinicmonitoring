@@ -26,7 +26,7 @@ def _env_bool(key: str, default: bool) -> bool:
     return v.lower() in ("1", "true", "yes", "on")
 
 
-DEBUG = _env_bool("DJANGO_DEBUG", True)
+DEBUG = _env_bool("DJANGO_DEBUG", False)
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY:
@@ -52,14 +52,17 @@ CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf.split(",") if x.strip()]
 
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
     _cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     CORS_ALLOWED_ORIGINS = [x.strip() for x in _cors.split(",") if x.strip()]
+    CORS_ALLOW_CREDENTIALS = True   # credentials: 'include' uchun majburiy
 
 INSTALLED_APPS = [
     "daphne",
     "whitenoise.runserver_nostatic",
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -175,11 +178,11 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", True)
     CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
-    CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", True)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = "Strict"
-    CSRF_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_SAMESITE = "Lax"
+    # Cross-origin cookie uchun "None" kerak (clinicmonitoring.ziyrak.org → clinicmonitoringapi.ziyrak.org)
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_HTTPONLY = False   # JS CSRF token ni o'qishi kerak
+    CSRF_COOKIE_SAMESITE = "None"
     if _env_bool("DJANGO_SECURE_SSL_REDIRECT", False):
         SECURE_SSL_REDIRECT = True
         SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000"))

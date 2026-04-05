@@ -248,3 +248,87 @@ class ClinicalAuditLog(models.Model):
 
     class Meta:
         ordering = ["-timestamp"]
+
+
+class ClinicRegistration(models.Model):
+    """
+    Klinika ro'yxatdan o'tish so'rovi.
+    Admin panel orqali tasdiqlanadi va muddatli faollashtirish amalga oshiriladi.
+    """
+
+    class Status(models.TextChoices):
+        PENDING   = "pending",   "Kutilmoqda (tasdiqlanmagan)"
+        ACTIVE    = "active",    "Faol"
+        SUSPENDED = "suspended", "To'xtatilgan"
+        REJECTED  = "rejected",  "Rad etilgan"
+
+    # Klinika ma'lumotlari
+    clinic_name     = models.CharField(max_length=255, verbose_name="Klinika nomi")
+    clinic_address  = models.CharField(max_length=512, blank=True, verbose_name="Manzil")
+    clinic_phone    = models.CharField(max_length=32,  blank=True, verbose_name="Telefon")
+    clinic_email    = models.EmailField(blank=True,               verbose_name="Email")
+    director_name   = models.CharField(max_length=255, blank=True, verbose_name="Direktor ismi")
+    bed_count       = models.PositiveIntegerField(default=0,       verbose_name="Karavot soni")
+    notes           = models.TextField(blank=True,                  verbose_name="Izoh")
+
+    # Kirish ma'lumotlari (faqat tasdiqlanganda yaratiladi)
+    username        = models.CharField(max_length=64, unique=True,  verbose_name="Login (username)")
+    # Parol xeshlangan holda saqlanadi
+    _password_hash  = models.CharField(max_length=256, default="",  verbose_name="Parol (hash)")
+
+    # Holat va muddatlar
+    status          = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+        verbose_name="Holat",
+    )
+    active_until    = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Faollik muddati (gacha)",
+        help_text="Bo'sh qolsa — cheksiz. Admin o'rnatadi.",
+    )
+    registered_at   = models.DateTimeField(auto_now_add=True, verbose_name="Ro'yxatdan o'tgan vaqt")
+    activated_at    = models.DateTimeField(null=True, blank=True,   verbose_name="Faollashtirilgan vaqt")
+    activated_by    = models.ForeignKey(
+        "auth.User",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="activated_clinics",
+        verbose_name="Kim faollashtirdi",
+    )
+
+    # Bog'liq klinika (tasdiqlanganda yaratiladi)
+    clinic          = models.OneToOneField(
+        Clinic,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="registration",
+        verbose_name="Klinika (tizimda)",
+    )
+    clinic_user     = models.OneToOneField(
+        "auth.User",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="clinic_registration",
+        verbose_name="Foydalanuvchi (tizimda)",
+    )
+
+    def __str__(self):
+        return f"{self.clinic_name} [{self.get_status_display()}]"
+
+    @property
+    def is_active_now(self):
+        """Hozirda faolmi?"""
+        from django.utils import timezone
+        if self.status != self.Status.ACTIVE:
+            return False
+        if self.active_until and self.active_until < timezone.now():
+            return False
+        return True
+
+    class Meta:
+        ordering = ["-registered_at"]
+        verbose_name = "Klinika ro'yxati"
+        verbose_name_plural = "Klinika ro'yxatlari"
