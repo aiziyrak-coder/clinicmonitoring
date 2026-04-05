@@ -88,7 +88,7 @@ export function AddDeviceFromScreenModal({
       onSuccess();
       onClose();
     } catch {
-      setError('Tarmoq xatosi — server bilan aloqa yo'q.');
+        setError("Tarmoq xatosi — server bilan aloqa yo'q.");
     } finally {
       setBusy(false);
     }
@@ -239,7 +239,7 @@ export function AddDeviceFromScreenModal({
               disabled={!canSubmit}
               className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-40 font-semibold text-sm"
             >
-              {busy ? 'Saqlanmoqda…' : 'Qo'shish'}
+              {busy ? 'Saqlanmoqda\u2026' : "Qo\u2018shish"}
             </button>
           </div>
         </form>
