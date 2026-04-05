@@ -3,6 +3,7 @@ Monitor ekranidan (HL7/tarmoq sozlamalari) rasm orqali JSON chiqarish — Gemini
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -71,42 +72,68 @@ def parse_monitor_screen_image(raw: bytes) -> dict[str, Any]:
         raise ScreenParseError("Pillow kutubxonasi o'rnatilmagan.") from exc
 
     try:
-        import google.generativeai as genai
-    except ImportError as exc:
-        raise ScreenParseError("google-generativeai kutubxonasi o'rnatilmagan.") from exc
-
-    import io
-
-    try:
         img = Image.open(io.BytesIO(raw))
         img.load()
     except Exception as exc:
         raise ScreenParseError("Rasm fayli o'qilmadi yoki buzilgan.") from exc
-    if img.mode not in ("RGB", "RGBA"):
-        img = img.convert("RGB")
-    elif img.mode == "RGBA":
+
+    if img.mode == "RGBA":
         bg = Image.new("RGB", img.size, (255, 255, 255))
         bg.paste(img, mask=img.split()[3])
         img = bg
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
 
-    genai.configure(api_key=api_key)
-    model_name = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.0-flash-lite")
-    model = genai.GenerativeModel(model_name)
+    # JPEG bytes
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    img_bytes = buf.getvalue()
 
+    model_name = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash")
+
+    text = ""
+
+    # Yangi google-genai SDK
     try:
-        response = model.generate_content([_PARSE_PROMPT, img])
+        from google import genai
+        from google.genai import types as genai_types
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[
+                genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+                _PARSE_PROMPT,
+            ],
+        )
+        text = response.text or ""
+        logger.info("Gemini (google-genai SDK) model=%s OK", model_name)
+
+    except ImportError:
+        # Fallback: eski google-generativeai SDK
+        logger.warning("google-genai paket topilmadi, google-generativeai bilan urinilmoqda")
+        try:
+            import google.generativeai as genai_old  # type: ignore
+        except ImportError as exc:
+            raise ScreenParseError(
+                "google-genai yoki google-generativeai kutubxonasi o'rnatilmagan."
+            ) from exc
+
+        genai_old.configure(api_key=api_key)
+        model_obj = genai_old.GenerativeModel(model_name)
+        try:
+            resp = model_obj.generate_content([
+                _PARSE_PROMPT,
+                {"mime_type": "image/jpeg", "data": img_bytes},
+            ])
+        except Exception as exc:
+            logger.exception("Gemini vision xatolik (eski SDK)")
+            raise ScreenParseError(f"Gemini xatolik: {exc}") from exc
+        text = getattr(resp, "text", None) or ""
+
     except Exception as exc:
         logger.exception("Gemini vision xatolik")
         raise ScreenParseError(f"Gemini xatolik: {exc}") from exc
-
-    text = getattr(response, "text", None) or ""
-    if not text.strip() and response.candidates:
-        parts = []
-        for c in response.candidates:
-            for p in getattr(c.content, "parts", []) or []:
-                if hasattr(p, "text") and p.text:
-                    parts.append(p.text)
-        text = "\n".join(parts)
 
     if not text.strip():
         raise ScreenParseError("Model bo'sh javob qaytardi — rasmni aniqroq yuklang.")
