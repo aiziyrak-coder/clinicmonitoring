@@ -90,7 +90,7 @@ def parse_monitor_screen_image(raw: bytes) -> dict[str, Any]:
         img = bg
 
     genai.configure(api_key=api_key)
-    model_name = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.0-flash")
+    model_name = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.0-flash-lite")
     model = genai.GenerativeModel(model_name)
 
     try:
